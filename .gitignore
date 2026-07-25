@@ -1,4 +1,4 @@
-# Large raw synthetic CSVs/zip — served from the host (Stanford AFS); exceed GitHub's 100 MB/file limit
+# Raw synthetic source CSVs — intermediate build artifacts, NOT needed to run the site (and exceed GitHub file limits)
 data/sphere/
 
 # Local data-injection scripts (not part of the deployed site)
