@@ -1,0 +1,61 @@
+{
+ "demographics": {
+  "file": "demographics.parquet",
+  "rows": 644,
+  "cols": [
+   "age",
+   "sex",
+   "race",
+   "ethnicity",
+   "diagnosis"
+  ]
+ },
+ "biomarkers": {
+  "file": "biomarkers.parquet",
+  "rows": 618,
+  "ncols": 3,
+  "mb": 0.01
+ },
+ "cognitive": {
+  "file": "cognitive.parquet",
+  "rows": 634,
+  "ncols": 73,
+  "mb": 0.24
+ },
+ "proteomics_plasma": {
+  "file": "proteomics_plasma.parquet",
+  "rows": 422,
+  "ncols": 6900,
+  "mb": 15.8
+ },
+ "proteomics_csf": {
+  "file": "proteomics_csf.parquet",
+  "rows": 142,
+  "ncols": 5284,
+  "mb": 5.19
+ },
+ "imaging_amyloid": {
+  "file": "imaging_amyloid.parquet",
+  "rows": 276,
+  "ncols": 288,
+  "mb": 0.48
+ },
+ "imaging_tau": {
+  "file": "imaging_tau.parquet",
+  "rows": 197,
+  "ncols": 289,
+  "mb": 0.37
+ },
+ "wgs": {
+  "file": "wgs.parquet",
+  "rows": 396,
+  "ncols": 167,
+  "mb": 0.37
+ },
+ "scrna": {
+  "file": "scrna.parquet",
+  "rows": 310,
+  "ncols": 193325,
+  "mb": 353.12
+ }
+}

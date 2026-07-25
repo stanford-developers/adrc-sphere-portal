@@ -1,0 +1,18 @@
+# Speed up the portal on web.stanford.edu — the big data files (adrc_data.js ~11MB, adrc_dd.js ~3MB) are
+# served UNCOMPRESSED by default, which is the main cause of slow loads. Gzip them on the fly (JSON/JS
+# compresses ~4-6x → the ~14MB of data drops to ~3.3MB over the wire).
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE application/javascript text/javascript application/json text/css text/html text/plain image/svg+xml
+</IfModule>
+
+# Also handle servers that use SetOutputFilter instead of the type-based filter above.
+<IfModule mod_filter.c>
+  AddOutputFilterByType DEFLATE application/javascript text/javascript application/json text/css text/html
+</IfModule>
+
+# The data files are cache-busted with ?v=… — let the browser cache them so repeat visits are instant.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType application/javascript "access plus 30 days"
+  ExpiresByType text/javascript      "access plus 30 days"
+</IfModule>

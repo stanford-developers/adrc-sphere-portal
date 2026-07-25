@@ -1,0 +1,14 @@
+# Large raw synthetic CSVs/zip — served from the host (Stanford AFS); exceed GitHub's 100 MB/file limit
+data/sphere/
+
+# Local data-injection scripts (not part of the deployed site)
+scripts/inject_data.py
+scripts/inject_dd.py
+
+
+# Local backups / OS cruft
+*.bak
+.DS_Store
+
+# Local editor/preview tooling
+.claude/

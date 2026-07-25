@@ -1,0 +1,57 @@
+{
+ "scrna_unknown_doublets": {
+  "celltype": "Unknown_doublets",
+  "genes": 17575,
+  "mb": 31.0
+ },
+ "scrna_immature_b_cell": {
+  "celltype": "Immature_B_cell",
+  "genes": 17575,
+  "mb": 30.8
+ },
+ "scrna_dendritic_cell": {
+  "celltype": "Dendritic_cell",
+  "genes": 17575,
+  "mb": 31.1
+ },
+ "scrna_cd14_monocyte": {
+  "celltype": "CD14_Monocyte",
+  "genes": 17575,
+  "mb": 30.8
+ },
+ "scrna_cd16_monocyte": {
+  "celltype": "CD16_Monocyte",
+  "genes": 17575,
+  "mb": 31.7
+ },
+ "scrna_mature_b_cell": {
+  "celltype": "Mature_B_cell",
+  "genes": 17575,
+  "mb": 31.8
+ },
+ "scrna_megacaryocyte": {
+  "celltype": "Megacaryocyte",
+  "genes": 17575,
+  "mb": 30.5
+ },
+ "scrna_plasma_cell": {
+  "celltype": "Plasma_cell",
+  "genes": 17575,
+  "mb": 31.5
+ },
+ "scrna_cd8_t_cell": {
+  "celltype": "CD8_T_cell",
+  "genes": 17575,
+  "mb": 31.7
+ },
+ "scrna_cd4_t_cell": {
+  "celltype": "CD4_T_cell",
+  "genes": 17575,
+  "mb": 31.7
+ },
+ "scrna_nk_cell": {
+  "celltype": "NK_cell",
+  "genes": 17575,
+  "mb": 31.8
+ }
+}
