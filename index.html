@@ -1608,6 +1608,28 @@
             </div>
             <p class="agent-note">🔒 Stored only in this browser, never sent to Stanford.<br>Need a SPHERE key? <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one on the dashboard ↗</a> &nbsp;·&nbsp; Need a Claude key? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one from Anthropic ↗</a></p>
           </div>
+          <div class="agent-setup-card" id="av-profile" style="display:none">
+            <h3>Complete your profile</h3>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin:-4px 0 12px;"><span id="pfx-signin"></span> · <a href="#" onclick="agentDisconnect();return false;" style="color:var(--cardinal);">Sign out</a></p>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px;">A few details about you — required by the Stanford ADRC Data Use Agreement, and asked only once.</p>
+            <label style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:3px;">Full name</label>
+            <input id="pfx-name" type="text" autocomplete="name" style="width:100%;margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+            <label style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:3px;">Institution / affiliation</label>
+            <input id="pfx-inst" type="text" placeholder="e.g. Stanford University" style="width:100%;margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+            <label style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:3px;">Organization type</label>
+            <select id="pfx-orgtype" style="width:100%;margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;background:#fff;">
+              <option value="">Select…</option>
+              <option value="academic">Academic / university</option>
+              <option value="nonprofit">Non-profit research</option>
+              <option value="government">Government</option>
+              <option value="industry">Industry / commercial</option>
+              <option value="other">Other</option>
+            </select>
+            <label style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:3px;">Role</label>
+            <input id="pfx-role" type="text" placeholder="e.g. Faculty, Postdoc, Graduate student" onkeydown="if(event.key==='Enter')_authSaveProfileStep()" style="width:100%;margin-bottom:12px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+            <button class="agent-connect-btn" id="pfx-submit" style="width:100%;" onclick="_authSaveProfileStep()">Continue</button>
+            <div id="pfx-err" style="display:none;color:#c0392b;font-size:12.5px;margin-top:8px;"></div>
+          </div>
         </div>
 
         <!-- Chat panel -->
@@ -4325,7 +4347,7 @@ async function _authToken(){
   _authSave(await r.json()); return _session.access_token;
 }
 function _authErr(id, msg, ok){ const e=document.getElementById(id); if(e){ e.textContent=msg||''; e.style.display=msg?'':'none'; e.style.color=ok?'#3f7a4a':'#c0392b'; } }
-function _authView(id){ ['av-signin','av-keys'].forEach(v=>{ const el=document.getElementById(v); if(el) el.style.display=(v===id)?'':'none'; }); if(id==='av-signin') _authSetMode(_authMode); }
+function _authView(id){ ['av-signin','av-keys','av-profile'].forEach(v=>{ const el=document.getElementById(v); if(el) el.style.display=(v===id)?'':'none'; }); if(id==='av-signin') _authSetMode(_authMode); }
 function _authSetMode(m){
   _authMode=m; _authErr('av-err','');
   const on='background:var(--cardinal);color:#fff;', off='background:transparent;color:var(--text-secondary);';
@@ -4384,7 +4406,41 @@ function _instFromDomain(d){ if(!d) return ''; if(/stanford\.edu$/i.test(d)) ret
 async function _postSignIn(){
   const email=(_session&&_session.user&&(_session.user.email||_session.user.display_name))||'';
   const el=document.getElementById('kp-signin'); if(el) el.textContent = email ? ('Signed in as '+email) : 'Signed in';
+  // Capture affiliation once, right after sign-in, whenever the profile isn't complete yet. OAuth
+  // (Google/Microsoft) only gives us name+email, so this is where we collect institution/org_type/role
+  // for EVERY registered user — not just those who later reach the agent DUA gate. Fail-open: if the
+  // check errors, don't block the user from continuing.
+  try {
+    const t = await _authToken();
+    const r = await fetch(SPHERE_API_BASE + '/profile', { headers: { Authorization: 'Bearer ' + t } });
+    if (r.ok) { const d = await r.json(); if (!d.complete) { _authShowProfileStep(d.profile || {}); return; } }
+  } catch(_) { /* non-blocking */ }
   _authView('av-keys');
+}
+function _authShowProfileStep(p){
+  const g = (id) => document.getElementById(id);
+  const sp = g('pfx-signin'); const email=(_session&&_session.user&&(_session.user.email||_session.user.display_name))||'';
+  if (sp) sp.textContent = email ? ('Signed in as ' + email) : 'Signed in';
+  if (g('pfx-name')) g('pfx-name').value = (p && p.name) || (_session && _session.user && (_session.user.display_name || _session.user.name)) || '';
+  if (g('pfx-inst')) g('pfx-inst').value = (p && p.institution) || _instFromDomain((email.split('@')[1] || '')) || '';
+  if (g('pfx-role')) g('pfx-role').value = (p && p.role) || '';
+  if (g('pfx-orgtype')) g('pfx-orgtype').value = (p && p.org_type) || '';
+  _authErr('pfx-err','');
+  _authView('av-profile');
+}
+async function _authSaveProfileStep(){
+  const g = (id) => document.getElementById(id);
+  const name=(g('pfx-name').value||'').trim(), inst=(g('pfx-inst').value||'').trim(), org=g('pfx-orgtype').value, role=(g('pfx-role').value||'').trim();
+  _authErr('pfx-err','');
+  if(!name||!inst||!org||!role){ _authErr('pfx-err','Please fill in your name, institution, organization type, and role.'); return; }
+  const btn=g('pfx-submit'); if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try {
+    const t=await _authToken();
+    const r=await fetch(SPHERE_API_BASE+'/profile',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({name,institution:inst,org_type:org,role})});
+    if(!r.ok){ _authErr('pfx-err','Could not save your profile — try again.'); return; }
+    _authView('av-keys');
+  } catch(e){ _authErr('pfx-err','Network error — try again.'); }
+  finally { if(btn){ btn.disabled=false; btn.textContent='Continue'; } }
 }
 async function _authSaveProfile(){
   const name=(document.getElementById('pf-name').value||'').trim(), inst=(document.getElementById('pf-inst').value||'').trim(), role=document.getElementById('pf-role').value, use=(document.getElementById('pf-use').value||'').trim();
