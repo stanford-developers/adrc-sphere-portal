@@ -3861,9 +3861,10 @@ async function _agentExtractData(sql, label) {
 // ── DUA gate + access logging (agent data access is subject to the portal's DUA + tracked) ─────────
 const _AGENT_PORTAL = 'adrc';
 async function _agentDuaFetch(path, opts) {
+  const bearer = await _agentAuthBearer();
   return fetch(SPHERE_API_BASE + path, {
     ...opts,
-    headers: { 'Authorization': 'Bearer ' + _agentKey, 'Content-Type': 'application/json', ...((opts && opts.headers) || {}) },
+    headers: { 'Authorization': 'Bearer ' + bearer, 'Content-Type': 'application/json', ...((opts && opts.headers) || {}) },
   });
 }
 // Best-effort audit log of a data-access event (never blocks the user).
@@ -3874,7 +3875,7 @@ async function _agentLogAccess(channel, detail, n_rows, n_features) {
 }
 // Returns true if the user has accepted the current DUA (or accepts it now via the modal); false if declined.
 async function _agentEnsureDua() {
-  if (!_agentKey) return false;
+  if (!_agentReady()) return false;
   let info;
   try {
     const r = await _agentDuaFetch('/dua?portal=' + _AGENT_PORTAL, {});
@@ -4418,6 +4419,15 @@ async function _agentReqHeaders(){
     h['Authorization'] = 'Bearer ' + _agentKey;
   }
   return h;
+}
+
+// True once the agent is connected in EITHER mode (credits: a sphere_ key; BYOK: the user's Anthropic key).
+function _agentReady(){ return !!(_agentKey || (_billingMode === 'byok' && _byokKey)); }
+// Bearer for SPHERE-authed side calls (DUA accept, data-access logging): the sphere_ key in credits mode,
+// or the SPHERE session token in BYOK mode (those endpoints accept a session JWT too). Null if neither.
+async function _agentAuthBearer(){
+  if (_agentKey) return _agentKey;
+  try { return await _authToken(); } catch(_) { return null; }
 }
 
 // ── Low-balance warning (credits mode) ─────────────────────────────
@@ -5098,7 +5108,7 @@ function agentPrompt(text) {
 }
 
 async function agentSend() {
-  if (_agentBusy || !_agentKey) return;
+  if (_agentBusy || !_agentReady()) return;
   const input = document.getElementById('agent-input');
   const text = input.value.trim();
   if (!text) return;
@@ -5710,7 +5720,7 @@ function agentSaveMarkdown() {
 
 // ── save report ────────────────────────────────────────────────────
 async function agentSaveReport() {
-  if (!_agentKey || _agentMessages.length < 2) {
+  if (!_agentReady() || _agentMessages.length < 2) {
     alert('No analysis to report yet. Run an analysis first.');
     return;
   }
