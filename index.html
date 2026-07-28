@@ -4301,6 +4301,7 @@ let _session = null;             // { access_token, refresh_token, expires_at, u
 let _billingMode = 'credits';    // 'credits' | 'byok'
 let _byokKey = null;             // user's Anthropic key (BYOK, in-browser only)
 let _authMode = 'signin';        // 'signin' | 'signup'
+let _agentDuaOk = false;         // set once the DUA is accepted this session (gate at first agent turn)
 
 function _authLoad(){
   try { _session = JSON.parse(sessionStorage.getItem('sphere_session') || 'null'); } catch(_) { _session = null; }
@@ -4314,7 +4315,7 @@ function _authSave(d){
     user: d.user || (_session && _session.user) || null };
   sessionStorage.setItem('sphere_session', JSON.stringify(_session));
 }
-function _authSignOut(){ _session=null; _byokKey=null;
+function _authSignOut(){ _session=null; _byokKey=null; _agentDuaOk=false;
   sessionStorage.removeItem('sphere_session'); sessionStorage.removeItem('byok_key'); sessionStorage.removeItem('agent_key'); }
 async function _authToken(){
   if (!_session) throw new Error('not signed in');
@@ -5137,6 +5138,17 @@ async function agentSend() {
   const input = document.getElementById('agent-input');
   const text = input.value.trim();
   if (!text) return;
+  // DUA gate at the START of using SPHERE AI (first turn of the session), not deferred to data
+  // extraction. If the user declines, keep their typed text and don't send. Once accepted, the
+  // per-session flag skips the check on subsequent turns (extract_data re-checks as a safety net).
+  if (!_agentDuaOk) {
+    _agentBusy = true;
+    document.getElementById('agent-send-btn').disabled = true;
+    let ok = false;
+    try { ok = await _agentEnsureDua(); } finally { _agentBusy = false; document.getElementById('agent-send-btn').disabled = false; }
+    if (!ok) return;
+    _agentDuaOk = true;
+  }
   input.value = '';
   input.style.height = ''; // collapse the auto-grown input back to default
   _agentWorkingLine = null; // reset single-line tracker for this send
@@ -5424,8 +5436,10 @@ async function agentLoop() {
             agentSetStatus('Searching columns…', 'loading');
             result = await _agentFindColumns(block.input.domain, block.input.search, block.input.limit);
           } else if (block.name === 'extract_data') {
-            // Data access is subject to the portal's DUA + tracked.
-            const okDua = await _agentEnsureDua();
+            // Data access is subject to the portal's DUA + tracked. Normally already accepted at the
+            // first turn (agentSend gate); this is a safety net that re-checks only if not.
+            const okDua = _agentDuaOk || await _agentEnsureDua();
+            if (okDua) _agentDuaOk = true;
             if (!okDua) {
               result = 'Data extraction requires the user to accept the Stanford ADRC Data Use Agreement, which they have not done. No data was extracted. Politely tell the user they must accept the DUA to extract or download data.';
             } else {
