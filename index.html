@@ -864,7 +864,7 @@
   .agent-setup-card { width:100%; }
   /* The onboarding card (profile + DUA) is content-heavy — give it more width so it uses the horizontal
      space and stays shorter (less/no vertical scrolling). The simple sign-in/key cards keep 520px. */
-  #av-profile { max-width:760px; }
+  #av-profile { max-width:900px; }
   .agent-header { flex-shrink:0; }
   .agent-header h2 { font-family:var(--font-display); font-size:20px; font-weight:600; color:var(--text-primary); margin:0 0 .35rem; }
   .agent-header p { font-size:13.5px; color:var(--text-secondary); margin:0; }
@@ -5267,8 +5267,9 @@ async function _agentStreamCall() {
     headers: await _agentReqHeaders(),
     body: JSON.stringify({
       model: _agentModel,
-      max_tokens: 32000, // Claude 5 runs adaptive thinking by default (shares this budget); 8192 truncated
-      // turns mid-analysis → the loop re-ran and produced duplicate figures/outputs. The Worker caps at 32000.
+      max_tokens: 64000, // Claude 5 runs adaptive thinking by default (shares this budget); 8192 truncated
+      // turns mid-analysis → the loop re-ran and produced duplicate figures/outputs. The Worker caps at 64000
+      // (= Haiku 4.5's max output; Opus/Sonnet/Fable 5 go to 128k).
       stream: true,
       system: [{ type: 'text', text: AGENT_SYSTEM, cache_control: { type: 'ephemeral' } }],
       tools: _agentCachedTools(),
