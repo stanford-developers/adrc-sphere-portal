@@ -1630,9 +1630,10 @@
             <span class="agent-status-dot ready" id="agent-status-dot">●</span>
             <span class="agent-status-text" id="agent-status-text">Ready</span>
             <select class="agent-model-select" id="agent-model-select" title="Model">
-              <option value="claude-opus-4-8">Opus — most capable</option>
-              <option value="claude-sonnet-4-6">Sonnet — balanced</option>
-              <option value="claude-haiku-4-5">Haiku — fastest</option>
+              <option value="claude-opus-5">Opus 5 — most capable</option>
+              <option value="claude-fable-5">Fable 5 — maximum capability (2× cost)</option>
+              <option value="claude-sonnet-5">Sonnet 5 — balanced</option>
+              <option value="claude-haiku-4-5">Haiku 4.5 — fastest</option>
             </select>
             <div class="agent-status-actions">
               <span id="agent-memory-badge" style="display:none;font-size:11px;color:#888;padding:.2rem .5rem;border:1px solid #ddd;border-radius:10px;cursor:pointer;" title="Clear memory" onclick="if(confirm('Clear all saved learnings?')){_agentClearLearnings();}"></span>
@@ -3638,7 +3639,7 @@ function renderMetrics(metrics, modalityKey = '') {
 // ═══════════════════════════════════════════════════════════════════
 // AI ANALYSIS AGENT — SPHERE AI style
 // ═══════════════════════════════════════════════════════════════════
-let _agentModel    = 'claude-opus-4-8';
+let _agentModel    = 'claude-opus-5';
 // SPHERE metered backend (direct-Anthropic passthrough, authenticated by a sphere_ API key).
 // The pasted key is billed to the user's SPHERE wallet; nothing goes to Anthropic from the browser.
 const SPHERE_API_BASE = 'https://sphere-stream-proxy.statzihuai.workers.dev';
