@@ -4404,6 +4404,22 @@ async function _sendBeacon(usage, model){
   } catch(_){}
 }
 
+// Build headers for a Worker /v1-messages call. Credits => the sphere_ key. BYOK => a SPHERE session
+// token (identity) + the user's Anthropic key in x-sphere-byok, so the Worker runs the call with THEIR
+// key and meters it + stores the transcript exactly like credits — no client-side beacon, no double count.
+async function _agentReqHeaders(){
+  const h = { 'content-type': 'application/json' };
+  if (_billingMode === 'byok' && _byokKey) {
+    let tok = null; try { tok = await _authToken(); } catch(_){}
+    if (tok) h['Authorization'] = 'Bearer ' + tok;
+    else if (_agentKey && _agentKey.startsWith('sphere_')) h['Authorization'] = 'Bearer ' + _agentKey;
+    h['x-sphere-byok'] = _byokKey;
+  } else {
+    h['Authorization'] = 'Bearer ' + _agentKey;
+  }
+  return h;
+}
+
 // ── Low-balance warning (credits mode) ─────────────────────────────
 // After each turn, check the SPHERE wallet balance and warn before it runs dry — so a long
 // analysis doesn't die mid-way. Offers an inline switch to the user's own Claude key to continue.
@@ -5154,13 +5170,10 @@ function _agentCachedMessages() {
 async function _agentStreamCall() {
   const _reqT0 = performance.now();     // [latency diag] request start
   let _firstByteT = 0, _usage = null;   // [latency diag] first SSE byte + token usage
-  const _useByok = _billingMode === 'byok' && _byokKey;
-  const resp = await fetch(_useByok ? 'https://api.anthropic.com/v1/messages' : (SPHERE_API_BASE + '/v1-messages?conversation_id=' + _agentConvoId()), {
+  const resp = await fetch(SPHERE_API_BASE + '/v1-messages?conversation_id=' + _agentConvoId(), {
     method: 'POST',
     signal: _agentAbort.signal,
-    headers: _useByok
-      ? { 'content-type': 'application/json', 'x-api-key': _byokKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
-      : { 'Authorization': 'Bearer ' + _agentKey, 'content-type': 'application/json' },
+    headers: await _agentReqHeaders(),
     body: JSON.stringify({
       model: _agentModel,
       max_tokens: 8192,
@@ -5294,7 +5307,6 @@ async function _agentStreamCall() {
       Math.round((_firstByteT || _reqT0) - _reqT0) + 'ms  total=' + Math.round(performance.now() - _reqT0) +
       'ms  | model=' + _agentModel + '  usage=' + JSON.stringify(_usage || {}));
   } catch (_) {}
-  if (_useByok && _usage) _sendBeacon(_usage, _agentModel);
   return { content, stop_reason };
 }
 
@@ -5758,12 +5770,9 @@ Note which datasets are complete vs. portal subsets (scRNAseq: 21 marker genes o
 
 Write in third person, past tense. Be concise and precise. Use real numbers from the analysis — do not be vague.` }
     ];
-    const _useByok2 = _billingMode === 'byok' && _byokKey;
-    const resp = await fetch(_useByok2 ? 'https://api.anthropic.com/v1/messages' : (SPHERE_API_BASE + '/v1-messages?conversation_id=' + _uuid()), {
+    const resp = await fetch(SPHERE_API_BASE + '/v1-messages?conversation_id=' + _uuid(), {
       method: 'POST',
-      headers: _useByok2
-        ? { 'content-type': 'application/json', 'x-api-key': _byokKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
-        : { 'Authorization': 'Bearer ' + _agentKey, 'content-type': 'application/json' },
+      headers: await _agentReqHeaders(),
       body: JSON.stringify({
         model: _agentModel,
         max_tokens: 1800,
@@ -5772,7 +5781,6 @@ Write in third person, past tense. Be concise and precise. Use real numbers from
     });
     if (resp.ok) {
       const data = await resp.json();
-      if (_useByok2 && data.usage) _sendBeacon(data.usage, _agentModel);
       narrative = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     } else {
       const err = await resp.json().catch(() => ({}));
