@@ -857,6 +857,11 @@
   /* ── AI Agent ── */
   .agent-layout { display:flex; flex-direction:column; height:calc(100vh - 56px); padding:1.25rem 1.5rem; gap:1rem; box-sizing:border-box; }
   .agent-layout.connected { padding:.5rem 1rem; gap:.5rem; }
+  /* Setup/onboarding state: fill the layout height, center the card, and SCROLL when the card (profile +
+     DUA + agree + button) is taller than the viewport — otherwise the "Agree & Continue" button falls
+     below the fold and can't be clicked. Centering also fills the otherwise-blank right side. */
+  #agent-setup-panel { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column; align-items:center; padding:.25rem 0 1.5rem; }
+  .agent-setup-card { width:100%; }
   .agent-header { flex-shrink:0; }
   .agent-header h2 { font-family:var(--font-display); font-size:20px; font-weight:600; color:var(--text-primary); margin:0 0 .35rem; }
   .agent-header p { font-size:13.5px; color:var(--text-secondary); margin:0; }
