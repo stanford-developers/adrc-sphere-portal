@@ -862,6 +862,9 @@
      below the fold and can't be clicked. Centering also fills the otherwise-blank right side. */
   #agent-setup-panel { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column; align-items:center; padding:.25rem 0 1.5rem; }
   .agent-setup-card { width:100%; }
+  /* The onboarding card (profile + DUA) is content-heavy — give it more width so it uses the horizontal
+     space and stays shorter (less/no vertical scrolling). The simple sign-in/key cards keep 520px. */
+  #av-profile { max-width:760px; }
   .agent-header { flex-shrink:0; }
   .agent-header h2 { font-family:var(--font-display); font-size:20px; font-weight:600; color:var(--text-primary); margin:0 0 .35rem; }
   .agent-header p { font-size:13.5px; color:var(--text-secondary); margin:0; }
