@@ -97,7 +97,7 @@ CARD = ('<div style="background:var(--bg-white);border:1px solid var(--border);b
         '<div style="font-weight:500;font-size:13px;color:var(--text-primary);margin-bottom:2px;">{t}</div>'
         '<div style="font-size:12px;color:var(--text-muted);">{a} &middot; <em>{j}</em> {y} &middot; '
         '<a href="https://pubmed.ncbi.nlm.nih.gov/{p}/" target="_blank" rel="noopener" '
-        'style="color:var(--cardinal);text-decoration:none;">PMID:{p}</a>{cite}</div></div>')
+        'style="color:var(--cardinal);text-decoration:none;">PMID:{p}</a></div></div>')
 YLABEL = ('<div style="font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;'
           'color:var(--text-muted);margin-bottom:.5rem;">{y}</div>')
 GRP = '<div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem;">{c}</div>'
@@ -139,22 +139,20 @@ def build_block():
         body.append(YLABEL.format(y=y))
         cards = []
         for u, r in picks:
-            n = cc.get(u, 0)
-            cite = f' &middot; {n:,} citation{"s" if n != 1 else ""}' if n else ""
             cards.append(CARD.format(t=esc(r.get("title", "").rstrip(".")), a=esc(authors(r)),
                                      j=esc(jclean(r.get("fulljournalname") or r.get("source", ""))),
-                                     y=y, p=u, cite=cite))
+                                     y=y, p=u))
         body.append(GRP.format(c="".join(cards)))
     body = "\n          ".join(body)
 
     tot = f"{total:,}"
     link = f"https://pubmed.ncbi.nlm.nih.gov/?term={SERIAL}%5BGrant+Number%5D&amp;sort=date"
     intro = ('<p style="font-size:13.5px;color:var(--text-muted);margin-bottom:1.25rem;">'
-             'The most-cited peer-reviewed publications per year acknowledging NIH/NIA grant '
-             f'<strong>P30AG066515</strong> (the Stanford ADRC) &mdash; <strong>{tot} total</strong>, '
-             'ranked by citations (NIH iCite) and auto-compiled from PubMed. '
+             'Selected peer-reviewed publications acknowledging NIH/NIA grant '
+             f'<strong>P30AG066515</strong> (the Stanford ADRC), grouped by year. The full list of '
+             f'<strong>{tot}</strong> publications can be found '
              f'<a href="{link}" target="_blank" rel="noopener" '
-             'style="color:var(--cardinal);text-decoration:none;">view the complete list on PubMed &#8594;</a></p>')
+             'style="color:var(--cardinal);text-decoration:none;">on PubMed &#8594;</a>.</p>')
     footer = ('<div style="text-align:center;padding:.5rem 0 0;">\n'
               f'            <a href="{link}" target="_blank" rel="noopener" '
               'style="color:var(--cardinal);font-size:13px;font-weight:500;text-decoration:none;">'
