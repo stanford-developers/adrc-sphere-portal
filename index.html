@@ -3912,12 +3912,27 @@ function _agentShowDuaModal(info) {
           <div class="agent-dua-actions"><button class="agent-dua-cancel">Cancel</button><button class="agent-dua-accept">Agree &amp; Continue</button></div>
         </div>`;
     } else {
+      // Profile incomplete (typical for Google sign-in — we only get name + email). Collect the DUA
+      // identity fields inline so the user never leaves the portal; /dua/accept backfills the profile.
+      const nm = _escHtml(p.name || (_session && _session.user && (_session.user.display_name || _session.user.name)) || '');
+      const opt = (v, l, sel) => '<option value="' + v + '"' + (sel ? ' selected' : '') + '>' + l + '</option>';
       overlay.innerHTML = `
         <div class="agent-dua-modal">
-          <p style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin:0 0 .4rem;">Complete your SPHERE profile</p>
-          <p class="agent-dua-sub">Your SPHERE account is missing the profile details (name, institution, role) needed for the Data Use Agreement.</p>
-          <div class="agent-dua-signas">Add them in your <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">SPHERE account settings</a>, then return and try again.</div>
-          <div class="agent-dua-actions"><button class="agent-dua-cancel">Close</button></div>
+          <p style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin:0 0 .4rem;">Data Use Agreement</p>
+          <p class="agent-dua-sub">A few details are required for the Stanford ADRC Data Use Agreement. Complete them, read the agreement below, and confirm your acceptance.</p>
+          <div class="agent-dua-form">
+            <label>Full name<input type="text" id="agent-dua-name" value="${nm}" autocomplete="name"></label>
+            <label>Institution / Organization<input type="text" id="agent-dua-inst" placeholder="Stanford University" autocomplete="organization"></label>
+            <label>Organization type<select id="agent-dua-orgtype">${opt('', 'Select…', 1) + opt('academic', 'Academic / University') + opt('nonprofit', 'Non-Profit Research Institute') + opt('government', 'Government / Public Agency') + opt('industry', 'Industry / For-Profit') + opt('other', 'Other')}</select></label>
+            <label>Role / Title<input type="text" id="agent-dua-role" placeholder="PhD Student / Postdoc / PI"></label>
+          </div>
+          ${duaTextHtml}
+          <div class="dua-agree-row">
+            <input type="checkbox" id="agent-dua-agree">
+            <label for="agent-dua-agree">I have read the Stanford ADRC Data Use Agreement in its entirety and agree to comply with all terms and conditions — including that the Data is for <strong>non-commercial research use only</strong> (no commercial use, and no training of commercial AI/ML models), data security requirements, no re-identification, publication acknowledgment, and reporting obligations.</label>
+          </div>
+          <div class="agent-dua-err"></div>
+          <div class="agent-dua-actions"><button class="agent-dua-cancel">Cancel</button><button class="agent-dua-accept">Agree &amp; Continue</button></div>
         </div>`;
     }
     document.body.appendChild(overlay);
@@ -3926,10 +3941,19 @@ function _agentShowDuaModal(info) {
     const acceptBtn = overlay.querySelector('.agent-dua-accept');
     if (acceptBtn) acceptBtn.onclick = async () => {
       const err = overlay.querySelector('.agent-dua-err');
+      // If the inline profile form is present (incomplete profile), gather + validate the fields.
+      let fields = null;
+      if (overlay.querySelector('#agent-dua-name')) {
+        const g = (id) => (overlay.querySelector(id)?.value || '').trim();
+        fields = { name: g('#agent-dua-name'), institution: g('#agent-dua-inst'), org_type: g('#agent-dua-orgtype'), role: g('#agent-dua-role') };
+        if (!fields.name || !fields.institution || !fields.org_type || !fields.role) { err.textContent = 'Please fill in your name, institution, organization type, and role.'; return; }
+      }
       if (!overlay.querySelector('#agent-dua-agree').checked) { err.textContent = 'Please read and agree to the Data Use Agreement to proceed.'; return; }
       err.textContent = ''; acceptBtn.disabled = true; acceptBtn.textContent = 'Recording…';
       try {
-        const r = await _agentDuaFetch('/dua/accept', { method: 'POST', body: JSON.stringify({ portal: _AGENT_PORTAL, channel: 'agent' }) });
+        const payload = { portal: _AGENT_PORTAL, channel: 'agent' };
+        if (fields) payload.fields = fields;   // Worker backfills the profile from these on first accept.
+        const r = await _agentDuaFetch('/dua/accept', { method: 'POST', body: JSON.stringify(payload) });
         if (!r.ok) { acceptBtn.disabled = false; acceptBtn.textContent = 'Agree & Continue'; err.textContent = 'Could not record acceptance — please try again.'; return; }
         close(true);
       } catch (_) { acceptBtn.disabled = false; acceptBtn.textContent = 'Agree & Continue'; err.textContent = 'Network error — please try again.'; }
