@@ -1609,26 +1609,9 @@
             <p class="agent-note">🔒 Stored only in this browser, never sent to Stanford.<br>Need a SPHERE key? <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one on the dashboard ↗</a> &nbsp;·&nbsp; Need a Claude key? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one from Anthropic ↗</a></p>
           </div>
           <div class="agent-setup-card" id="av-profile" style="display:none">
-            <h3>Complete your profile</h3>
+            <h3>One more step</h3>
             <p style="font-size:12.5px;color:var(--text-secondary);margin:-4px 0 12px;"><span id="pfx-signin"></span> · <a href="#" onclick="agentDisconnect();return false;" style="color:var(--cardinal);">Sign out</a></p>
-            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px;">A few details about you — required by the Stanford ADRC Data Use Agreement, and asked only once.</p>
-            <label style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:3px;">Full name</label>
-            <input id="pfx-name" type="text" autocomplete="name" style="width:100%;margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
-            <label style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:3px;">Institution / affiliation</label>
-            <input id="pfx-inst" type="text" placeholder="e.g. Stanford University" style="width:100%;margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
-            <label style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:3px;">Organization type</label>
-            <select id="pfx-orgtype" style="width:100%;margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;background:#fff;">
-              <option value="">Select…</option>
-              <option value="academic">Academic / university</option>
-              <option value="nonprofit">Non-profit research</option>
-              <option value="government">Government</option>
-              <option value="industry">Industry / commercial</option>
-              <option value="other">Other</option>
-            </select>
-            <label style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:3px;">Role</label>
-            <input id="pfx-role" type="text" placeholder="e.g. Faculty, Postdoc, Graduate student" onkeydown="if(event.key==='Enter')_authSaveProfileStep()" style="width:100%;margin-bottom:12px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
-            <button class="agent-connect-btn" id="pfx-submit" style="width:100%;" onclick="_authSaveProfileStep()">Continue</button>
-            <div id="pfx-err" style="display:none;color:#c0392b;font-size:12.5px;margin-top:8px;"></div>
+            <div id="pfx-body"><!-- profile fields (if needed) + DUA + agree, built by _authShowOnboarding() --></div>
           </div>
         </div>
 
@@ -4323,7 +4306,7 @@ let _session = null;             // { access_token, refresh_token, expires_at, u
 let _billingMode = 'credits';    // 'credits' | 'byok'
 let _byokKey = null;             // user's Anthropic key (BYOK, in-browser only)
 let _authMode = 'signin';        // 'signin' | 'signup'
-let _agentDuaOk = false;         // set once the DUA is accepted this session (gate at first agent turn)
+let _agentDuaOk = false;         // true once DUA accepted (at sign-in onboarding); lets extract_data skip its re-check
 
 function _authLoad(){
   try { _session = JSON.parse(sessionStorage.getItem('sphere_session') || 'null'); } catch(_) { _session = null; }
@@ -4406,74 +4389,74 @@ function _instFromDomain(d){ if(!d) return ''; if(/stanford\.edu$/i.test(d)) ret
 async function _postSignIn(){
   const email=(_session&&_session.user&&(_session.user.email||_session.user.display_name))||'';
   const el=document.getElementById('kp-signin'); if(el) el.textContent = email ? ('Signed in as '+email) : 'Signed in';
-  // Capture affiliation once, right after sign-in, whenever the profile isn't complete yet. OAuth
-  // (Google/Microsoft) only gives us name+email, so this is where we collect institution/org_type/role
-  // for EVERY registered user — not just those who later reach the agent DUA gate. Fail-open: if the
-  // check errors, don't block the user from continuing.
+  // Up-front onboarding: capture affiliation AND record DUA acceptance in ONE step right after sign-in,
+  // before the agent — so (a) affiliation is collected for EVERY registered user (OAuth only gives us
+  // name+email), and (b) the first message to the AI sends instantly, with no DUA fetch/modal mid-chat.
+  // A single /dua read tells us both whether they've accepted and whether the profile is complete.
+  // Fail-open: if the check errors, don't block sign-in (the extract_data gate is still a backstop).
   try {
     const t = await _authToken();
-    const r = await fetch(SPHERE_API_BASE + '/profile', { headers: { Authorization: 'Bearer ' + t } });
-    if (r.ok) { const d = await r.json(); if (!d.complete) { _authShowProfileStep(d.profile || {}); return; } }
+    const r = await fetch(SPHERE_API_BASE + '/dua?portal=' + _AGENT_PORTAL, { headers: { Authorization: 'Bearer ' + t } });
+    if (r.ok) {
+      const info = await r.json();
+      if (info.accepted || info.dua_configured === false) { _agentDuaOk = true; _authView('av-keys'); return; }
+      _authShowOnboarding(info); return;
+    }
   } catch(_) { /* non-blocking */ }
   _authView('av-keys');
 }
-function _authShowProfileStep(p){
-  const g = (id) => document.getElementById(id);
-  const sp = g('pfx-signin'); const email=(_session&&_session.user&&(_session.user.email||_session.user.display_name))||'';
-  if (sp) sp.textContent = email ? ('Signed in as ' + email) : 'Signed in';
-  if (g('pfx-name')) g('pfx-name').value = (p && p.name) || (_session && _session.user && (_session.user.display_name || _session.user.name)) || '';
-  if (g('pfx-inst')) g('pfx-inst').value = (p && p.institution) || _instFromDomain((email.split('@')[1] || '')) || '';
-  if (g('pfx-role')) g('pfx-role').value = (p && p.role) || '';
-  if (g('pfx-orgtype')) g('pfx-orgtype').value = (p && p.org_type) || '';
-  _authErr('pfx-err','');
+// Build + show the combined "profile + DUA" onboarding card. Profile fields appear only when the profile
+// is incomplete; otherwise we show "Signing as …". The DUA text + agree checkbox always appear.
+function _authShowOnboarding(info){
+  const p = info.profile || {};
+  const complete = !!info.profile_complete;
+  const email=(_session&&_session.user&&(_session.user.email||_session.user.display_name))||'';
+  const sp=document.getElementById('pfx-signin'); if(sp) sp.textContent = email ? ('Signed in as '+email) : 'Signed in';
+  const srcBox = document.querySelector('#dua-gate .dua-scroll-box');
+  const duaTextHtml = srcBox ? srcBox.outerHTML
+    : '<div class="dua-scroll-box">' + _escHtml(info.dua_text || 'Access to SPHERE datasets requires acceptance of the Stanford ADRC Data Use Agreement.') + '</div>';
+  const nm = _escHtml(p.name || (_session&&_session.user&&(_session.user.display_name||_session.user.name)) || '');
+  const instGuess = _escHtml(p.institution || _instFromDomain((email.split('@')[1]||'')) || '');
+  const opt = (v,l,sel) => '<option value="'+v+'"'+(sel?' selected':'')+'>'+l+'</option>';
+  let head, form;
+  if (complete) {
+    head = '<p class="agent-dua-sub">Before you start, please review and accept the Stanford ADRC Data Use Agreement.</p>';
+    form = '<div class="agent-dua-signas">Signing as <strong>'+_escHtml(p.name||'')+'</strong>'+(p.role?' · '+_escHtml(p.role):'')+(p.institution?' · '+_escHtml(p.institution):'')+' <span style="color:var(--text-muted)">(from your SPHERE account)</span></div>';
+  } else {
+    head = '<p class="agent-dua-sub">A few details about you, then review and accept the Stanford ADRC Data Use Agreement. Asked only once.</p>';
+    form = '<div class="agent-dua-form">'
+      + '<label>Full name<input type="text" id="pfx-name" value="'+nm+'" autocomplete="name"></label>'
+      + '<label>Institution / Organization<input type="text" id="pfx-inst" value="'+instGuess+'" placeholder="Stanford University" autocomplete="organization"></label>'
+      + '<label>Organization type<select id="pfx-orgtype">'+(opt('','Select…',1)+opt('academic','Academic / University')+opt('nonprofit','Non-Profit Research Institute')+opt('government','Government / Public Agency')+opt('industry','Industry / For-Profit')+opt('other','Other'))+'</select></label>'
+      + '<label>Role / Title<input type="text" id="pfx-role" placeholder="PhD Student / Postdoc / PI"></label>'
+      + '</div>';
+  }
+  document.getElementById('pfx-body').innerHTML = head + form + duaTextHtml
+    + '<div class="dua-agree-row"><input type="checkbox" id="pfx-agree"><label for="pfx-agree">I have read the Stanford ADRC Data Use Agreement in its entirety and agree to comply with all terms and conditions — including that the Data is for <strong>non-commercial research use only</strong> (no commercial use, and no training of commercial AI/ML models), data security requirements, no re-identification, publication acknowledgment, and reporting obligations.</label></div>'
+    + '<div id="pfx-err" style="display:none;color:#c0392b;font-size:12.5px;margin:8px 0;"></div>'
+    + '<button class="agent-connect-btn" id="pfx-submit" style="width:100%;" onclick="_authAcceptOnboarding()">Agree &amp; Continue</button>';
   _authView('av-profile');
 }
-async function _authSaveProfileStep(){
-  const g = (id) => document.getElementById(id);
-  const name=(g('pfx-name').value||'').trim(), inst=(g('pfx-inst').value||'').trim(), org=g('pfx-orgtype').value, role=(g('pfx-role').value||'').trim();
-  _authErr('pfx-err','');
-  if(!name||!inst||!org||!role){ _authErr('pfx-err','Please fill in your name, institution, organization type, and role.'); return; }
-  const btn=g('pfx-submit'); if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+// Records profile (when collected) + DUA acceptance in ONE /dua/accept call, then proceeds to key connect.
+async function _authAcceptOnboarding(){
+  const q=(id)=>document.getElementById(id);
+  const err=q('pfx-err'); const setErr=(m)=>{ if(err){ err.textContent=m; err.style.display=m?'':'none'; } };
+  let fields=null;
+  if (q('pfx-name')) {
+    const g=(id)=>((q(id)&&q(id).value)||'').trim();
+    fields={ name:g('pfx-name'), institution:g('pfx-inst'), org_type:(q('pfx-orgtype')&&q('pfx-orgtype').value)||'', role:g('pfx-role') };
+    if(!fields.name||!fields.institution||!fields.org_type||!fields.role){ setErr('Please fill in your name, institution, organization type, and role.'); return; }
+  }
+  if (!q('pfx-agree') || !q('pfx-agree').checked) { setErr('Please read and agree to the Data Use Agreement to continue.'); return; }
+  setErr(''); const btn=q('pfx-submit'); if(btn){ btn.disabled=true; btn.textContent='Recording…'; }
   try {
     const t=await _authToken();
-    const r=await fetch(SPHERE_API_BASE+'/profile',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({name,institution:inst,org_type:org,role})});
-    if(!r.ok){ _authErr('pfx-err','Could not save your profile — try again.'); return; }
-    _authView('av-keys');
-  } catch(e){ _authErr('pfx-err','Network error — try again.'); }
-  finally { if(btn){ btn.disabled=false; btn.textContent='Continue'; } }
-}
-async function _authSaveProfile(){
-  const name=(document.getElementById('pf-name').value||'').trim(), inst=(document.getElementById('pf-inst').value||'').trim(), role=document.getElementById('pf-role').value, use=(document.getElementById('pf-use').value||'').trim();
-  _authErr('pf-err',''); if(!name||!inst||!role){ _authErr('pf-err','Name, institution and role are required.'); return; }
-  try { const t=await _authToken();
-    const r=await fetch(SPHERE_API_BASE+'/profile',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({display_name:name,institution:inst,role:role,intended_use:use})});
-    if(!r.ok){ _authErr('pf-err','Could not save your profile — try again.'); return; }
-    _authView('av-billing');
-  } catch(e){ _authErr('pf-err','Network error — try again.'); }
-}
-function _pickBilling(mode){
-  _billingMode=mode; sessionStorage.setItem('sphere_billing',mode);
-  document.getElementById('bl-credits').style.borderColor = mode==='credits'?'var(--cardinal)':'var(--border)';
-  document.getElementById('bl-credits').style.background = mode==='credits'?'#fdf5f5':'#fff';
-  document.getElementById('bl-byok').style.borderColor = mode==='byok'?'var(--cardinal)':'var(--border)';
-  document.getElementById('bl-byok').style.background = mode==='byok'?'#fdf5f5':'#fff';
-  document.getElementById('bl-keybox').style.display = mode==='byok'?'':'none';
-  document.getElementById('bl-continue').textContent = mode==='byok'?'Connect my Anthropic key':'Continue with free credits';
-}
-async function _billingContinue(){
-  _authErr('bl-err','');
-  if(_billingMode==='byok'){ const k=(document.getElementById('bl-key').value||'').trim(); if(!/^sk-ant-/.test(k)){ _authErr('bl-err','Enter your Anthropic API key (starts with sk-ant-).'); return; } _byokKey=k; sessionStorage.setItem('byok_key',k); }
-  try { await _provisionAndConnect(); } catch(e){ _authErr('bl-err','Could not connect — '+(e.message||'try again')); }
-}
-// Silently mint a session-authed sphere_ key — used for portal auth (DUA / data-access) AND, in credits
-// mode, for the metered /v1-messages call. The user never sees or pastes it.
-async function _provisionAndConnect(){
-  const t=await _authToken();
-  const r=await fetch(SPHERE_API_BASE+'/keys',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({action:'create',name:'portal-session'})});
-  if(!r.ok) throw new Error('key provisioning failed ('+r.status+')');
-  const d=await r.json(); if(!d.key) throw new Error('no key returned');
-  _agentKey=d.key; sessionStorage.setItem('agent_key',_agentKey);
-  _agentShowChat(); await agentEnsurePyodide();
+    const payload={ portal:_AGENT_PORTAL, channel:'agent' }; if(fields) payload.fields=fields;
+    const r=await fetch(SPHERE_API_BASE+'/dua/accept',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!r.ok){ setErr('Could not record acceptance — please try again.'); return; }
+    _agentDuaOk=true; _authView('av-keys');
+  } catch(e){ setErr('Network error — please try again.'); }
+  finally { if(btn){ btn.disabled=false; btn.textContent='Agree & Continue'; } }
 }
 // BYOK usage beacon — report client-direct Anthropic usage to SPHERE (session-authed) so tokens are tracked.
 async function _sendBeacon(usage, model){
@@ -5194,17 +5177,9 @@ async function agentSend() {
   const input = document.getElementById('agent-input');
   const text = input.value.trim();
   if (!text) return;
-  // DUA gate at the START of using SPHERE AI (first turn of the session), not deferred to data
-  // extraction. If the user declines, keep their typed text and don't send. Once accepted, the
-  // per-session flag skips the check on subsequent turns (extract_data re-checks as a safety net).
-  if (!_agentDuaOk) {
-    _agentBusy = true;
-    document.getElementById('agent-send-btn').disabled = true;
-    let ok = false;
-    try { ok = await _agentEnsureDua(); } finally { _agentBusy = false; document.getElementById('agent-send-btn').disabled = false; }
-    if (!ok) return;
-    _agentDuaOk = true;
-  }
+  // NOTE: the DUA is accepted up-front at sign-in (the onboarding card), so there is NO gate here —
+  // the first message sends immediately (no dead-air fetch). extract_data still re-checks as a backstop
+  // for pasted-key users who bypassed onboarding.
   input.value = '';
   input.style.height = ''; // collapse the auto-grown input back to default
   _agentWorkingLine = null; // reset single-line tracker for this send
