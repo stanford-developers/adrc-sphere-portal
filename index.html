@@ -5239,6 +5239,11 @@ async function agentSend() {
   input.value = '';
   input.style.height = ''; // collapse the auto-grown input back to default
   _agentWorkingLine = null; // reset single-line tracker for this send
+  // Each new question gets a fresh results panel. Previously the panel only cleared on Reset, so figures
+  // and tables accumulated across the whole conversation and a new question still showed the PREVIOUS
+  // question's figure. _agentClearResultsPanel() also re-seeds the "already surfaced" sets from the
+  // sandbox listing, so those leftover files aren't re-added — this turn's new results surface normally.
+  _agentClearResultsPanel();
 
   // Auto-collapse about banner on first message
   if (!_agentHadFirstMsg) {
