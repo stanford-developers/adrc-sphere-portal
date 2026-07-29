@@ -5143,6 +5143,12 @@ function _agentClearResultsPanel() {
   // (no Python execution, nothing near the agent/streaming loop); loaded datasets are Python globals,
   // not files, so they are unaffected.
   _agentDeleteGeneratedFiles(true);   // full clean slate on Reset (incl. analysis.py)
+  // Also drop saved "learnings". They live in localStorage and are injected into the FIRST turn of every
+  // new session as "[Persistent memory from previous sessions — apply proactively]". That carried the
+  // previous session's analysis into the next question, so the agent re-ran it — which is why an amyloid
+  // figure kept being REGENERATED (slightly different each time) for an unrelated question. Reset should
+  // mean a genuinely fresh agent, so the memory goes too.
+  try { _agentClearLearnings(); } catch (_) {}
   // Deleting files is not enough: a figure from the previous session can still be OPEN in matplotlib's
   // global registry. run_python ends with `if plt.get_fignums(): _patched_show()`, which would capture
   // that stale open figure and surface it into the new question's panel — exactly the "figure comes back"
