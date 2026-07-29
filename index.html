@@ -4939,6 +4939,7 @@ async function _agentRunAnalysisPy() {
   _rpItems = [];
   _agentSurfacedCsvs.clear();
   _agentSurfacedPngs.clear();
+  _agentDeleteGeneratedFiles();   // drop stale figs/tables so only analysis.py's own outputs surface
   const _rpT = document.getElementById('rp-tabs');
   const _rpP = document.getElementById('rp-panels');
   if (_rpT) _rpT.innerHTML = '';
@@ -5114,24 +5115,30 @@ function _agentRenderResultsPanel() {
   _agentSurfaceTableCsvs();
 }
 
+// Remove agent-generated figures/tables from the sandbox (fig_*.png, any *.png, table_*.csv).
+// Pure Pyodide FS calls — no Python execution. Loaded datasets live as Python globals, not files.
+function _agentDeleteGeneratedFiles() {
+  try {
+    if (!_agentPyodide) return;
+    for (const f of _agentPyodide.FS.readdir('/sandbox')) {
+      if (/\.png$/i.test(f) || /^table_.*\.csv$/i.test(f)) {
+        try { _agentPyodide.FS.unlink('/sandbox/' + f); } catch (_) {}
+      }
+    }
+  } catch (_) { /* sandbox not ready — nothing to clean */ }
+}
+
 function _agentClearResultsPanel() {
   _rpItems = [];
   _agentSurfacedCsvs.clear();
   _agentSurfacedPngs.clear();
-  // The panel is now empty, but the PREVIOUS chat's fig_*.png / table_*.csv are still sitting in the
-  // sandbox. Since we just cleared the "already surfaced" sets, the next run's scan would re-add them —
-  // that's why old figures/tables reappeared after Reset. Re-seed the sets with whatever is currently on
-  // disk so those leftovers count as already-seen. A new analysis writes new filenames (or rewrites one,
-  // which the surfacing scan re-reads by content), so genuinely new results still show up.
-  // Read-only directory listing: no sandbox mutation, no Python execution, nothing near the agent loop.
-  try {
-    if (_agentPyodide) {
-      for (const f of _agentPyodide.FS.readdir('/sandbox')) {
-        if (/\.png$/i.test(f)) _agentSurfacedPngs.add(f);
-        else if (/^table_.*\.csv$/i.test(f)) _agentSurfacedCsvs.add(f);
-      }
-    }
-  } catch (_) { /* sandbox not ready yet — nothing to re-seed */ }
+  // Also delete the previous session's generated figure/table files. Marking them "already surfaced"
+  // isn't enough: the final run_analysis_py step resets that tracking (so it can re-surface figures it
+  // rewrites), after which the file scan would pick these stale files up again — which is why old
+  // figures kept reappearing. Deleting them is the only unambiguous fix. Uses Pyodide's FS API directly
+  // (no Python execution, nothing near the agent/streaming loop); loaded datasets are Python globals,
+  // not files, so they are unaffected.
+  _agentDeleteGeneratedFiles();
   const tabs = document.getElementById('rp-tabs');
   const panels = document.getElementById('rp-panels');
   if (tabs) tabs.innerHTML = '';
