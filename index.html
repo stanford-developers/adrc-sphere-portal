@@ -5086,10 +5086,8 @@ function _agentRenderResultsPanel() {
 
 function _agentClearResultsPanel() {
   _rpItems = [];
-  // NOTE: deliberately do NOT clear _agentSurfacedCsvs / _agentSurfacedPngs here. They track which
-  // sandbox files have already been surfaced; keeping them across a Reset means the previous session's
-  // leftover fig_*.png / table_*.csv are treated as "already seen" and are NOT re-surfaced into the new
-  // chat's (now empty) results panel. A new analysis writes new filenames, which surface normally.
+  _agentSurfacedCsvs.clear();
+  _agentSurfacedPngs.clear();
   const tabs = document.getElementById('rp-tabs');
   const panels = document.getElementById('rp-panels');
   if (tabs) tabs.innerHTML = '';
@@ -5367,15 +5365,6 @@ async function _agentStreamCall() {
         const b = ev.content_block;
         if (b.type === 'text') {
           cur = { type: 'text', text: '' };
-        } else if (b.type === 'thinking') {
-          // Opus 5 (and the Claude 5 family) stream ADAPTIVE THINKING blocks. We must KEEP each thinking
-          // block (with its signature) in the assistant message content and replay it on the next turn —
-          // the API requires it alongside the following tool_use. Dropping it makes the model lose its
-          // reasoning chain and redo the analysis (the duplicate-figures + "no streaming" symptom). Not
-          // rendered to the user; the "Claude is thinking…" indicator covers it.
-          cur = { type: 'thinking', thinking: '', signature: '' };
-        } else if (b.type === 'redacted_thinking') {
-          cur = { type: 'redacted_thinking', data: b.data || '' };
         } else if (b.type === 'tool_use') {
           sealTextStream();
           if (firstContent) { firstContent = false; const t = document.getElementById('agent-thinking'); if (t) t.remove(); }
@@ -5386,10 +5375,6 @@ async function _agentStreamCall() {
         if (ev.delta.type === 'text_delta') {
           cur.text += ev.delta.text;
           appendTextDelta(ev.delta.text);
-        } else if (ev.delta.type === 'thinking_delta') {
-          cur.thinking += ev.delta.thinking;        // accumulate reasoning (internal; not shown)
-        } else if (ev.delta.type === 'signature_delta') {
-          cur.signature += ev.delta.signature;      // needed to replay the thinking block on the next turn
         } else if (ev.delta.type === 'input_json_delta') {
           cur._json += ev.delta.partial_json;
         }
