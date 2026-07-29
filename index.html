@@ -4505,6 +4505,15 @@ async function _agentReqHeaders(){
   return h;
 }
 
+// Thinking parameter for the agent request. Spread into the body: `..._agentThinkingParam()`.
+// Fable 5 REJECTS {type:'disabled'} with a 400 (thinking is always on there) — so we omit the field for
+// it. Everything else (Opus 5, Sonnet 5, Haiku 4.5) gets thinking disabled, which is what keeps text
+// streaming to the user as the agent works. Disabling is valid at effort 'high' or lower; we send no
+// effort, so that holds.
+function _agentThinkingParam() {
+  return /fable|mythos/i.test(_agentModel || '') ? {} : { thinking: { type: 'disabled' } };
+}
+
 // True once the agent is connected in EITHER mode (credits: a sphere_ key; BYOK: the user's Anthropic key).
 function _agentReady(){ return !!(_agentKey || (_billingMode === 'byok' && _byokKey)); }
 // Bearer for SPHERE-authed side calls (DUA accept, data-access logging): the sphere_ key in credits mode,
@@ -4914,6 +4923,20 @@ async function _agentRunAnalysisPy() {
   try { code = _agentPyodide.FS.readFile('/sandbox/analysis.py', { encoding: 'utf8' }); }
   catch(e) { return { stdout: 'Error: analysis.py not found in /sandbox/. Write it first via write_file.', stderr: '', exit: 1, figures: [] }; }
 
+  // analysis.py is the FINAL, canonical output; run_python figures are exploration only (see the
+  // run_python tool description). Both were being surfaced, so the user saw the exploratory figure AND
+  // its regenerated twin from analysis.py — the "repeated figures/tables". Drop the exploratory items
+  // here so the panel ends up with ONE clean set: the verified analysis.py results. Clearing the
+  // surfaced-file sets (without re-seeding) lets analysis.py's figures surface even when it reuses the
+  // same filenames.
+  _rpItems = [];
+  _agentSurfacedCsvs.clear();
+  _agentSurfacedPngs.clear();
+  const _rpT = document.getElementById('rp-tabs');
+  const _rpP = document.getElementById('rp-panels');
+  if (_rpT) _rpT.innerHTML = '';
+  if (_rpP) _rpP.innerHTML = '';
+
   let stdout = '';
   _agentPyodide.setStdout({ batched: s => { stdout += s + '\n'; } });
   _agentPyodide.setStderr({ batched: s => { stdout += '[stderr] ' + s + '\n'; } });
@@ -5291,6 +5314,11 @@ async function _agentStreamCall() {
       // turns mid-analysis → the loop re-ran and produced duplicate figures/outputs. The Worker caps at 64000
       // (= Haiku 4.5's max output; Opus/Sonnet/Fable 5 go to 128k).
       stream: true,
+      // Thinking OFF for the interactive agent (except Fable 5 — see _agentThinkingParam). With the
+      // Claude 5 family's adaptive thinking ON, the model narrates inside hidden thinking blocks, so
+      // nothing streams to the user until the very end and each tool turn looks stalled. Disabling it
+      // restores the streams-as-it-writes experience users had on Opus 4.8.
+      ..._agentThinkingParam(),
       system: [{ type: 'text', text: AGENT_SYSTEM, cache_control: { type: 'ephemeral' } }],
       tools: _agentCachedTools(),
       messages: _agentCachedMessages()
