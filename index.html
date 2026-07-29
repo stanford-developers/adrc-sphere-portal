@@ -4939,6 +4939,7 @@ async function _agentRunAnalysisPy() {
   _rpItems = [];
   _agentSurfacedCsvs.clear();
   _agentSurfacedPngs.clear();
+  _agentShownFigB64.clear();
   _agentDeleteGeneratedFiles();   // drop stale figs/tables so only analysis.py's own outputs surface
   const _rpT = document.getElementById('rp-tabs');
   const _rpP = document.getElementById('rp-panels');
@@ -5068,6 +5069,7 @@ function _agentDownscaleB64(b64, maxEdge) {
 // The plt.show() capture misses these because savefig()+close() never calls show — this is why the
 // agent sometimes reported figures that never appeared. Tracked so re-runs don't duplicate a figure.
 let _agentSurfacedPngs = new Set();
+let _agentShownFigB64  = new Set();   // content hashes of figures already shown (dedupe same plot re-saved)
 function _agentSurfaceFigPngs() {
   if (!_agentPyodide) return;
   let files = [];
@@ -5078,7 +5080,13 @@ function _agentSurfaceFigPngs() {
     try { bytes = _agentPyodide.FS.readFile('/sandbox/' + f); } catch (_) { continue; }
     if (!bytes || !bytes.length) continue;
     _agentSurfacedPngs.add(f);
-    _agentPanelAddFigures([_agentBytesToB64(bytes)]);
+    // Dedupe by CONTENT, not just filename. The agent often saves the same plot again under a new name
+    // (e.g. an exploratory fig_x.png and then fig_x_final.png), which produced "Figure 1" and "Figure 2"
+    // of the identical chart. Skip a file whose bytes we've already shown this session.
+    const b64 = _agentBytesToB64(bytes);
+    if (_agentShownFigB64.has(b64)) continue;
+    _agentShownFigB64.add(b64);
+    _agentPanelAddFigures([b64]);
   }
 }
 
@@ -5136,6 +5144,7 @@ function _agentClearResultsPanel() {
   _rpItems = [];
   _agentSurfacedCsvs.clear();
   _agentSurfacedPngs.clear();
+  _agentShownFigB64.clear();
   // Also delete the previous session's generated figure/table files. Marking them "already surfaced"
   // isn't enough: the final run_analysis_py step resets that tracking (so it can re-surface figures it
   // rewrites), after which the file scan would pick these stale files up again — which is why old
