@@ -5117,11 +5117,15 @@ function _agentRenderResultsPanel() {
 
 // Remove agent-generated figures/tables from the sandbox (fig_*.png, any *.png, table_*.csv).
 // Pure Pyodide FS calls — no Python execution. Loaded datasets live as Python globals, not files.
-function _agentDeleteGeneratedFiles() {
+function _agentDeleteGeneratedFiles(includeSources) {
   try {
     if (!_agentPyodide) return;
     for (const f of _agentPyodide.FS.readdir('/sandbox')) {
-      if (/\.png$/i.test(f) || /^table_.*\.csv$/i.test(f)) {
+      // includeSources also removes analysis.py / *.md — used ONLY by Reset. Leaving the old analysis.py
+      // behind was why figures came back DURING the next question: the agent re-ran the previous session's
+      // script, regenerating its figures even though the PNGs were deleted. The run_analysis_py path must
+      // NOT remove sources (it needs analysis.py for re-runs and the 'Code (.py)' download link).
+      if (/\.png$/i.test(f) || /^table_.*\.csv$/i.test(f) || (includeSources && /\.(py|md)$/i.test(f))) {
         try { _agentPyodide.FS.unlink('/sandbox/' + f); } catch (_) {}
       }
     }
@@ -5138,7 +5142,7 @@ function _agentClearResultsPanel() {
   // figures kept reappearing. Deleting them is the only unambiguous fix. Uses Pyodide's FS API directly
   // (no Python execution, nothing near the agent/streaming loop); loaded datasets are Python globals,
   // not files, so they are unaffected.
-  _agentDeleteGeneratedFiles();
+  _agentDeleteGeneratedFiles(true);   // full clean slate on Reset (incl. analysis.py)
   const tabs = document.getElementById('rp-tabs');
   const panels = document.getElementById('rp-panels');
   if (tabs) tabs.innerHTML = '';
