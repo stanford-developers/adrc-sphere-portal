@@ -5086,8 +5086,11 @@ function _agentRenderResultsPanel() {
 
 function _agentClearResultsPanel() {
   _rpItems = [];
-  _agentSurfacedCsvs.clear();
-  _agentSurfacedPngs.clear();
+  // Intentionally KEEP _agentSurfacedCsvs / _agentSurfacedPngs (do not clear). They track which sandbox
+  // files have already been surfaced. Keeping them across a Reset means the previous chat's leftover
+  // fig_*.png / table_*.csv are treated as "already seen" and are NOT re-surfaced into the new (empty)
+  // results panel. A new analysis writes new filenames, which surface normally. (This is a purely
+  // client-side fix — it does not touch the Python sandbox or the streaming parser.)
   const tabs = document.getElementById('rp-tabs');
   const panels = document.getElementById('rp-panels');
   if (tabs) tabs.innerHTML = '';
