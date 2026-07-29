@@ -5088,6 +5088,20 @@ function _agentClearResultsPanel() {
   _rpItems = [];
   _agentSurfacedCsvs.clear();
   _agentSurfacedPngs.clear();
+  // The panel is now empty, but the PREVIOUS chat's fig_*.png / table_*.csv are still sitting in the
+  // sandbox. Since we just cleared the "already surfaced" sets, the next run's scan would re-add them —
+  // that's why old figures/tables reappeared after Reset. Re-seed the sets with whatever is currently on
+  // disk so those leftovers count as already-seen. A new analysis writes new filenames (or rewrites one,
+  // which the surfacing scan re-reads by content), so genuinely new results still show up.
+  // Read-only directory listing: no sandbox mutation, no Python execution, nothing near the agent loop.
+  try {
+    if (_agentPyodide) {
+      for (const f of _agentPyodide.FS.readdir('/sandbox')) {
+        if (/\.png$/i.test(f)) _agentSurfacedPngs.add(f);
+        else if (/^table_.*\.csv$/i.test(f)) _agentSurfacedCsvs.add(f);
+      }
+    }
+  } catch (_) { /* sandbox not ready yet — nothing to re-seed */ }
   const tabs = document.getElementById('rp-tabs');
   const panels = document.getElementById('rp-panels');
   if (tabs) tabs.innerHTML = '';
@@ -5299,6 +5313,18 @@ async function _agentStreamCall() {
   let cur = null;
   let stop_reason = 'end_turn';
 
+  // Adaptive thinking can run for a while before any visible text. Refresh the "thinking" line with an
+  // elapsed counter so the UI clearly reads as working-in-progress rather than stalled.
+  const _thinkT0 = performance.now();
+  let _thinkDots = 0;
+  function _agentThinkingTick() {
+    const el = document.getElementById('agent-thinking');
+    if (!el) return;
+    const secs = Math.round((performance.now() - _thinkT0) / 1000);
+    _thinkDots = (_thinkDots + 1) % 4;
+    el.textContent = 'Claude is thinking' + '.'.repeat(_thinkDots || 1) + (secs >= 3 ? '  (' + secs + 's)' : '');
+  }
+
   // Streaming text state
   let streamEl     = null;   // the .agent-msg wrapper (flex column)
   let streamBubble = null;   // the .agent-msg-bubble we render markdown INTO (normal flow, like sealed msgs)
@@ -5365,6 +5391,14 @@ async function _agentStreamCall() {
         const b = ev.content_block;
         if (b.type === 'text') {
           cur = { type: 'text', text: '' };
+        } else if (b.type === 'thinking') {
+          // Opus 5 / the Claude 5 family stream ADAPTIVE THINKING blocks. The API requires each thinking
+          // block (with its signature) to be replayed in the assistant message alongside the tool_use that
+          // follows it. Dropping them makes the model lose its reasoning chain between tool turns and redo
+          // the analysis — which showed up as duplicate figures/tables. Captured here, never rendered.
+          cur = { type: 'thinking', thinking: '', signature: '' };
+        } else if (b.type === 'redacted_thinking') {
+          cur = { type: 'redacted_thinking', data: b.data || '' };
         } else if (b.type === 'tool_use') {
           sealTextStream();
           if (firstContent) { firstContent = false; const t = document.getElementById('agent-thinking'); if (t) t.remove(); }
@@ -5375,6 +5409,11 @@ async function _agentStreamCall() {
         if (ev.delta.type === 'text_delta') {
           cur.text += ev.delta.text;
           appendTextDelta(ev.delta.text);
+        } else if (ev.delta.type === 'thinking_delta') {
+          cur.thinking += ev.delta.thinking;    // internal reasoning — kept for replay, not displayed
+          _agentThinkingTick();                 // keep the status line alive so it never looks stalled
+        } else if (ev.delta.type === 'signature_delta') {
+          cur.signature += ev.delta.signature;  // required to replay the thinking block next turn
         } else if (ev.delta.type === 'input_json_delta') {
           cur._json += ev.delta.partial_json;
         }
