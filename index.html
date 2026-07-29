@@ -4907,8 +4907,15 @@ async function _agentRunPython(code) {
     await _agentPyodide.runPythonAsync(code);
     await _agentPyodide.runPythonAsync('import matplotlib.pyplot as _mplt\nif _mplt.get_fignums(): _patched_show()');
     const figs = Array.from(_agentPyodide.globals.get('_agent_figures').toJs());
+    // A plot that is BOTH saved (plt.savefig('fig_x.png')) and left open/shown was being added twice —
+    // once from this in-memory capture and again by the file scan below — which is the "repeated same
+    // figure" (Figure 1 + Figure 2 of the same plot). If this run wrote any not-yet-surfaced fig_*.png,
+    // prefer the FILE version (it has stable PNG/Code download links) and drop the in-memory copies.
+    // Same rule run_analysis_py already uses. A figure only shown (never saved) still surfaces in-memory.
+    let savedNew = 0;
+    try { savedNew = _agentPyodide.FS.readdir('/sandbox').filter(f => /\.png$/i.test(f) && !_agentSurfacedPngs.has(f)).length; } catch (_) {}
     // Route all figures to the right results panel (not inline in chat)
-    if (figs.length) _agentPanelAddFigures(figs);
+    if (figs.length && !savedNew) _agentPanelAddFigures(figs);
     _agentSurfaceFigPngs();
     _agentSurfaceTableCsvs();
     return { output: stdout.trim() || '(no output)', error: null };
