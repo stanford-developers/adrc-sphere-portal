@@ -5143,6 +5143,17 @@ function _agentClearResultsPanel() {
   // (no Python execution, nothing near the agent/streaming loop); loaded datasets are Python globals,
   // not files, so they are unaffected.
   _agentDeleteGeneratedFiles(true);   // full clean slate on Reset (incl. analysis.py)
+  // Deleting files is not enough: a figure from the previous session can still be OPEN in matplotlib's
+  // global registry. run_python ends with `if plt.get_fignums(): _patched_show()`, which would capture
+  // that stale open figure and surface it into the new question's panel — exactly the "figure comes back"
+  // report. Close every figure and drop the capture buffers so nothing carries over.
+  try {
+    if (_agentPyodide) _agentPyodide.runPython(
+      "import matplotlib.pyplot as _p\n_p.close('all')\n" +
+      "try:\n    _agent_figures.clear()\nexcept Exception:\n    pass\n" +
+      "try:\n    _agent_last_figure = None\nexcept Exception:\n    pass\n"
+    );
+  } catch (_) { /* pyodide not ready yet — nothing to close */ }
   const tabs = document.getElementById('rp-tabs');
   const panels = document.getElementById('rp-panels');
   if (tabs) tabs.innerHTML = '';
