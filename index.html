@@ -4565,17 +4565,23 @@ function _sphereDashUrl(base){
     return base + (base.indexOf('#') >= 0 ? '&' : '#') + 'sphere_sso=' + encodeURIComponent(payload);
   }catch(_){ return base; }
 }
-// Rewrite dashboard links whenever we show a signed-in view.
-function _sphereApplyDashLinks(){
+// Attach the session AT CLICK TIME via one delegated listener. Pre-rewriting hrefs only worked if the
+// rewrite happened to run after that particular card had rendered, so arriving at the key step by any
+// other path (already signed in, returning to the tab, after the DUA step) left the link plain and the
+// dashboard asked for a second sign-in. Click-time is path-independent and always uses the freshest token.
+document.addEventListener('click', function(e){
   try{
-    if(!_session || !_session.access_token) return;
-    document.querySelectorAll('a[href^="https://www.sphereworld.ai"]').forEach(function(a){
-      if(a.dataset.ssoDone) return;
-      a.dataset.ssoDone = '1';
-      a.href = _sphereDashUrl(a.getAttribute('href'));
-    });
-  }catch(_){}
-}
+    var a = e.target && e.target.closest && e.target.closest('a[href^="https://www.sphereworld.ai"]');
+    if(!a) return;
+    if(!_session || !_session.access_token) return;   // signed out -> leave the plain link alone
+    var href = a.getAttribute('href') || '';
+    if(href.indexOf('sphere_sso=') >= 0) return;      // already carries a hand-off
+    e.preventDefault();
+    window.open(_sphereDashUrl(href), a.getAttribute('target') || '_blank', 'noopener');
+  }catch(_){ /* on any error fall through to the normal link */ }
+}, true);
+// No-op shim so existing call sites stay valid.
+function _sphereApplyDashLinks(){ /* handled by the delegated click listener above */ }
 
 // True once the agent is connected in EITHER mode (credits: a sphere_ key; BYOK: the user's Anthropic key).
 function _agentReady(){ return !!(_agentKey || (_billingMode === 'byok' && _byokKey)); }
