@@ -4455,6 +4455,7 @@ async function _postSignIn(){
     }
   } catch(_) { /* non-blocking */ }
   _authView('av-keys');
+  _sphereApplyDashLinks();
 }
 // Build + show the combined "profile + DUA" onboarding card. Profile fields appear only when the profile
 // is incomplete; otherwise we show "Signing as …". The DUA text + agree checkbox always appear.
@@ -4544,6 +4545,36 @@ async function _agentReqHeaders(){
 // effort, so that holds.
 function _agentThinkingParam() {
   return /fable|mythos/i.test(_agentModel || '') ? {} : { thinking: { type: 'disabled' } };
+}
+
+// ── SSO hand-off to the SPHERE dashboard ──────────────────────────────────────────────────────────
+// The dashboard lives on another origin (www.sphereworld.ai), so it cannot see the session we hold here
+// and used to demand a SECOND sign-in just to view the account / create a key. Attach the session to the
+// link's URL FRAGMENT (fragments are never sent to a server); the dashboard adopts it and strips it from
+// history immediately. Only ever attached to our own sphereworld.ai links, and only when signed in.
+function _sphereDashUrl(base){
+  try{
+    if(!_session || !_session.access_token) return base;
+    const payload = btoa(JSON.stringify({
+      access_token: _session.access_token,
+      refresh_token: _session.refresh_token || null,
+      expires_at: _session.expires_at || (Date.now() + 3600*1000),
+      user: _session.user || null,
+      portal: _AGENT_PORTAL
+    }));
+    return base + (base.indexOf('#') >= 0 ? '&' : '#') + 'sphere_sso=' + encodeURIComponent(payload);
+  }catch(_){ return base; }
+}
+// Rewrite dashboard links whenever we show a signed-in view.
+function _sphereApplyDashLinks(){
+  try{
+    if(!_session || !_session.access_token) return;
+    document.querySelectorAll('a[href^="https://www.sphereworld.ai"]').forEach(function(a){
+      if(a.dataset.ssoDone) return;
+      a.dataset.ssoDone = '1';
+      a.href = _sphereDashUrl(a.getAttribute('href'));
+    });
+  }catch(_){}
 }
 
 // True once the agent is connected in EITHER mode (credits: a sphere_ key; BYOK: the user's Anthropic key).
