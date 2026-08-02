@@ -4367,7 +4367,19 @@ async function _authSignup(){
   const email=(document.getElementById('av-email').value||'').trim(), pass=document.getElementById('av-pass').value||'';
   _authErr('av-err',''); if(!email||pass.length<8){ _authErr('av-err','Enter an email and a password (8+ characters), then click Create account.'); return; }
   try { const r=await fetch(_AUTH_BASE+'/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
-    if(!r.ok){ const d=await r.json().catch(()=>({})); _authErr('av-err', d.error || 'Could not create account (email may already exist — try Sign in).'); return; }
+    if(!r.ok){
+      // The auth backend returns a bare 500 "Internal server error" when the email is ALREADY registered
+      // (commonly via Google/Microsoft) — which reads as a portal outage and stops people signing up.
+      // Prefer our own actionable text for duplicate/500 cases and only surface upstream text when it is
+      // genuinely informative (e.g. weak-password validation).
+      const d = await r.json().catch(() => ({}));
+      const raw = String((d && (d.error || d.message)) || '');
+      const dup = r.status === 409 || r.status === 422 || /already|exists|duplicate|internal server error/i.test(raw);
+      _authErr('av-err', dup
+        ? 'That email is already registered. Use “Sign in” instead — and if you signed up with Google or Microsoft, use those buttons.'
+        : (raw || 'Could not create account — please try again.'));
+      return;
+    }
     _authSave(await r.json()); await _postSignIn();
   } catch(e){ _authErr('av-err','Network error — try again.'); }
 }
