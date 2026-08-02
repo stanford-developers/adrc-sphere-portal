@@ -1598,12 +1598,18 @@
           <div class="agent-setup-card" id="av-keys" style="display:none">
             <h3>Connect your key</h3>
             <p style="font-size:12.5px;color:var(--text-secondary);margin:-4px 0 10px;"><span id="kp-signin"></span> · <a href="#" onclick="agentDisconnect();return false;" style="color:var(--cardinal);">Sign out</a></p>
-            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:10px;">Paste your <strong>SPHERE key</strong> (<code>sphere_…</code>) to spend your free credits, or your own <strong>Claude API key</strong> (<code>sk-ant-…</code>) to bill your Anthropic account. Either way, usage is tracked in your SPHERE account.</p>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:10px;">You're signed in — start straight away with your free SPHERE credits. No key to copy.</p>
+            <button class="agent-connect-btn" id="av-autokey" style="width:100%;margin-bottom:6px;" onclick="_agentUseMyCredits()">Start with my free credits</button>
+            <div id="av-autokey-err" style="display:none;color:#c0392b;font-size:12.5px;margin-bottom:8px;"></div>
+            <details style="margin-top:6px;">
+              <summary style="cursor:pointer;font-size:12px;color:var(--text-muted);">Advanced: use your own key instead</summary>
+              <p style="font-size:12.5px;color:var(--text-secondary);margin:8px 0 6px;">Paste a <strong>SPHERE key</strong> (<code>sphere_…</code>) or your own <strong>Claude API key</strong> (<code>sk-ant-…</code>) to bill your Anthropic account. Either way, usage is tracked in your SPHERE account.</p>
             <div class="agent-key-row">
               <input type="text" id="agent-key-input" placeholder="sphere_…   or   sk-ant-…" autocomplete="new-password" spellcheck="false" onkeydown="if(event.key==='Enter')agentConnect()">
               <button class="agent-connect-btn" onclick="agentConnect()">Connect</button>
             </div>
-            <p class="agent-note">🔒 Stored only in this browser, never sent to Stanford.<br>Need a SPHERE key? <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one on the dashboard ↗</a> &nbsp;·&nbsp; Need a Claude key? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one from Anthropic ↗</a></p>
+            </details>
+            <p class="agent-note">🔒 Stored only in this browser, never sent to Stanford.<br>Need a Claude key? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one from Anthropic ↗</a> &nbsp;·&nbsp; Manage your SPHERE account on the <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">dashboard ↗</a></p>
           </div>
           <div class="agent-setup-card" id="av-profile" style="display:none">
             <h3>One more step</h3>
@@ -4450,11 +4456,22 @@ async function _postSignIn(){
     const r = await fetch(SPHERE_API_BASE + '/dua?portal=' + _AGENT_PORTAL, { headers: { Authorization: 'Bearer ' + t } });
     if (r.ok) {
       const info = await r.json();
-      if (info.accepted || info.dua_configured === false) { _agentDuaOk = true; _authView('av-keys'); return; }
+      if (info.accepted || info.dua_configured === false) { _agentDuaOk = true; _agentEnterAgent(); return; }
       _authShowOnboarding(info); return;
     }
   } catch(_) { /* non-blocking */ }
+  _agentEnterAgent();
+}
+// A user who just signed in has no SPHERE key yet. Rather than showing a "connect your key" step that
+// points at the dashboard (a second sign-in), mint one silently from the session they already have and
+// drop them straight into the agent. Falls back to the manual card if provisioning fails.
+async function _agentEnterAgent(){
+  if (_agentReady()) { _agentShowChat(); agentEnsurePyodide(); return; }
   _authView('av-keys');
+  const btn=document.getElementById('av-autokey');
+  if (btn) { btn.disabled=true; btn.textContent='Setting up your workspace…'; }
+  const ok = await _agentUseMyCredits();
+  if (!ok && btn) { btn.disabled=false; btn.textContent='Start with my free credits'; }
 }
 // Build + show the combined "profile + DUA" onboarding card. Profile fields appear only when the profile
 // is incomplete; otherwise we show "Signing as …". The DUA text + agree checkbox always appear.
@@ -4505,7 +4522,7 @@ async function _authAcceptOnboarding(){
     const payload={ portal:_AGENT_PORTAL, channel:'agent' }; if(fields) payload.fields=fields;
     const r=await fetch(SPHERE_API_BASE+'/dua/accept',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!r.ok){ setErr('Could not record acceptance — please try again.'); return; }
-    _agentDuaOk=true; _authView('av-keys');
+    _agentDuaOk=true; _agentEnterAgent();
   } catch(e){ setErr('Network error — please try again.'); }
   finally { if(btn){ btn.disabled=false; btn.textContent='Agree & Continue'; } }
 }
@@ -4544,6 +4561,28 @@ async function _agentReqHeaders(){
 // effort, so that holds.
 function _agentThinkingParam() {
   return /fable|mythos/i.test(_agentModel || '') ? {} : { thinking: { type: 'disabled' } };
+}
+
+// Mint a sphere_ key from the CURRENT session and connect — the user is already signed in here, so
+// sending them to www.sphereworld.ai (a second sign-in) just to copy a key was redundant friction.
+async function _agentUseMyCredits(){
+  const btn=document.getElementById('av-autokey'), err=document.getElementById('av-autokey-err');
+  const fail=(m)=>{ if(err){ err.textContent=m; err.style.display=''; } if(btn){ btn.disabled=false; btn.textContent='Start with my free credits'; } };
+  if(err) err.style.display='none';
+  if(btn){ btn.disabled=true; btn.textContent='Setting up…'; }
+  try{
+    const t=await _authToken();
+    const r=await fetch(SPHERE_API_BASE+'/keys',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},
+      body:JSON.stringify({action:'create',name:'portal-session'})});
+    if(!r.ok){ fail('Could not set up your key ('+r.status+'). Open the Advanced section to paste one, or try again.'); return false; }
+    const d=await r.json();
+    if(!d.key){ fail('No key was returned. Open the Advanced section to paste one.'); return false; }
+    _agentKey=d.key; _byokKey=null; _billingMode='credits';
+    sessionStorage.setItem('agent_key',_agentKey); sessionStorage.setItem('sphere_billing','credits'); sessionStorage.removeItem('byok_key');
+    _agentShowChat(); await agentEnsurePyodide();
+    return true;
+  }catch(e){ fail('Network error — please try again.'); }
+  return false;
 }
 
 // True once the agent is connected in EITHER mode (credits: a sphere_ key; BYOK: the user's Anthropic key).
