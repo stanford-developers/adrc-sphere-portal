@@ -1603,7 +1603,7 @@
               <input type="text" id="agent-key-input" placeholder="sphere_…   or   sk-ant-…" autocomplete="new-password" spellcheck="false" onkeydown="if(event.key==='Enter')agentConnect()">
               <button class="agent-connect-btn" onclick="agentConnect()">Connect</button>
             </div>
-            <p class="agent-note">🔒 Stored only in this browser, never sent to Stanford.<br>Need a SPHERE key? <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one on the dashboard ↗</a> &nbsp;·&nbsp; Need a Claude key? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one from Anthropic ↗</a></p>
+            <p class="agent-note">🔒 Stored only in this browser, never sent to Stanford.<br>Need a SPHERE key? <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one on the dashboard ↗</a> &nbsp;·&nbsp; Need a Claude key? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one from Anthropic ↗</a></p>
           </div>
           <div class="agent-setup-card" id="av-profile" style="display:none">
             <h3>One more step</h3>
@@ -1885,7 +1885,7 @@
             <div class="dua-full dua-key-field">
               <label for="dua-key">SPHERE API key <span style="color:var(--cardinal);">*</span></label>
               <input type="text" id="dua-key" class="dua-key-input" placeholder="sphere_…" autocomplete="off" spellcheck="false">
-              <div class="dua-key-hint">Sign in to download. Get a free key at <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">www.sphereworld.ai</a> — your acceptance and downloads are recorded under your account per the DUA.</div>
+              <div class="dua-key-hint">Sign in to download. Get a free key at <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">app.sphereworld.ai</a> — your acceptance and downloads are recorded under your account per the DUA.</div>
             </div>
           </div>
 
@@ -2802,7 +2802,7 @@ async function _downloadCheckKey() {
   if (!key.startsWith('sphere_')) {
     _dlDuaInfo = null; _setDownloadIdentityVisible(false); _dlSetAgreeVisible(false);
     const box = _dlStatusBox(); box.style.display = '';
-    box.innerHTML = 'Enter your SPHERE API key above to continue. Don\'t have one? <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">Register free</a> — your name and institution are saved to your account so you only agree to the DUA once.';
+    box.innerHTML = 'Enter your SPHERE API key above to continue. Don\'t have one? <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">Register free</a> — your name and institution are saved to your account so you only agree to the DUA once.';
     return;
   }
   let info;
@@ -2812,7 +2812,7 @@ async function _downloadCheckKey() {
     if (!r.ok) {
       _setDownloadIdentityVisible(false); _dlSetAgreeVisible(false);
       const box = _dlStatusBox(); box.style.display = '';
-      box.innerHTML = 'That SPHERE key was not recognized — check it, or <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">register</a>.';
+      box.innerHTML = 'That SPHERE key was not recognized — check it, or <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">register</a>.';
       return;
     }
   } catch (_) { return; }
@@ -2852,7 +2852,7 @@ function _applyDownloadGateIdentity(info) {
     box.style.display = ''; box.innerHTML = 'Signing as <strong>' + _escHtml(p.name || '') + '</strong>' + (p.role ? ' · ' + _escHtml(p.role) : '') + (p.institution ? ' · ' + _escHtml(p.institution) : '') + ' <span style="color:var(--text-muted)">(from your SPHERE account)</span>';
     _dlSetAgreeVisible(true);
   } else {
-    box.style.display = ''; box.innerHTML = 'Your SPHERE account is missing profile details (name, institution, role). Add them in your <a href="https://www.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">account settings</a>, then return.';
+    box.style.display = ''; box.innerHTML = 'Your SPHERE account is missing profile details (name, institution, role). Add them in your <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">account settings</a>, then return.';
     _dlSetAgreeVisible(false);
   }
 }
@@ -2863,7 +2863,7 @@ async function submitDUA() {
   const agree = g('dua-agree').checked;
   const errEl = g('dua-error');
   const fail  = m => { errEl.textContent = m; errEl.style.display = 'block'; };
-  if (!key.startsWith('sphere_')) return fail('Please enter your SPHERE API key to sign in. Get a free one at www.sphereworld.ai.');
+  if (!key.startsWith('sphere_')) return fail('Please enter your SPHERE API key to sign in. Get a free one at app.sphereworld.ai.');
   if (!agree) return fail('Please read and agree to the Data Use Agreement to proceed.');
   errEl.style.display = 'none';
 
@@ -2879,7 +2879,7 @@ async function submitDUA() {
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       setBtn('Agree & Access Downloads', false);
-      if (d && d.error === 'missing_profile') return fail('Your account is missing profile details. Please complete them at www.sphereworld.ai, then return.');
+      if (d && d.error === 'missing_profile') return fail('Your account is missing profile details. Please complete them at app.sphereworld.ai, then return.');
       return fail(d && d.error === 'unauthorized' ? 'That SPHERE key was not recognized — check it and try again.' : 'Could not record your agreement — please try again.');
     }
   } catch (_) { setBtn('Agree & Access Downloads', false); return fail('Network error — please try again.'); }
@@ -4548,7 +4548,7 @@ function _agentThinkingParam() {
 }
 
 // ── SSO hand-off to the SPHERE dashboard ──────────────────────────────────────────────────────────
-// The dashboard lives on another origin (www.sphereworld.ai), so it cannot see the session we hold here
+// The dashboard lives on another origin (app.sphereworld.ai — www is now the company site), so it
 // and used to demand a SECOND sign-in just to view the account / create a key. Attach the session to the
 // link's URL FRAGMENT (fragments are never sent to a server); the dashboard adopts it and strips it from
 // history immediately. Only ever attached to our own sphereworld.ai links, and only when signed in.
@@ -4571,7 +4571,7 @@ function _sphereDashUrl(base){
 // dashboard asked for a second sign-in. Click-time is path-independent and always uses the freshest token.
 document.addEventListener('click', function(e){
   try{
-    var a = e.target && e.target.closest && e.target.closest('a[href^="https://www.sphereworld.ai"]');
+    var a = e.target && e.target.closest && e.target.closest('a[href^="https://app.sphereworld.ai"]');
     if(!a) return;
     if(!_session || !_session.access_token) return;   // signed out -> leave the plain link alone
     var href = a.getAttribute('href') || '';
