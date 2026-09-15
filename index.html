@@ -1686,7 +1686,7 @@
           <!-- Input bar -->
           <div class="agent-input-bar">
             <button class="agent-attach-btn" onclick="document.getElementById('agent-attach-input').click()" title="Attach file">📎</button>
-            <input type="file" id="agent-attach-input" style="display:none" multiple accept=".txt,.py,.md,image/*" onchange="agentHandleAttach(this.files);this.value=''">
+            <input type="file" id="agent-attach-input" style="display:none" multiple accept=".txt,.csv,.py,.md,image/*" onchange="agentHandleAttach(this.files);this.value=''">
             <textarea id="agent-input" placeholder="Tell the agent what you want…  (Shift+Enter for new line)" rows="2" oninput="_agentAutoGrow(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();agentSend();}"></textarea>
             <button class="agent-stop-btn" id="agent-stop-btn" onclick="agentStop()">■ Stop</button>
             <button class="agent-send-btn" id="agent-send-btn" onclick="agentSend()">Send</button>
@@ -5294,12 +5294,6 @@ async function _agentPipInstall(packages) {
 // ── attachments ────────────────────────────────────────────────────
 async function agentHandleAttach(files) {
   for (const file of files) {
-    // Only the SPHERE data in this portal interacts with SPHERE AI. A data file attached to the chat
-    // would send its raw contents to the model, so data formats are refused (the picker hides them too).
-    if (/\.(csv|tsv|tab|json|jsonl|xlsx|xls|xlsm|ods|parquet|feather|sav|dta|sas7bdat|xpt|rds|rdata|rda|h5|hdf5|npy|npz|pkl|db|sqlite)$/i.test(file.name)) {
-      alert("Data files can't be attached — SPHERE AI works with the SPHERE data in this portal. To analyse your own data, use the SPHERE desktop app, which creates a SPHERE twin first.");
-      continue;
-    }
     const isImage = file.type.startsWith('image/');
     const reader = new FileReader();
     if (isImage) {
