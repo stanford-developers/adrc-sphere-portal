@@ -4988,7 +4988,9 @@ async function _agentRunPython(code) {
     // prefer the FILE version (it has stable PNG/Code download links) and drop the in-memory copies.
     // Same rule run_analysis_py already uses. A figure only shown (never saved) still surfaces in-memory.
     let savedNew = 0;
-    try { savedNew = _agentPyodide.FS.readdir('/sandbox').filter(f => /\.png$/i.test(f) && !_agentSurfacedPngs.has(f)).length; } catch (_) {}
+    // New OR re-saved-with-new-content figure files. Refining re-saves the same fig_x.png; counting only
+    // new filenames let the still-open copy of the refined plot through as another "Figure N".
+    savedNew = _agentChangedPngs().length;
     // Route all figures to the right results panel (not inline in chat)
     if (figs.length && !savedNew) _agentPanelAddFigures(figs);
     _agentSurfaceFigPngs();
@@ -5015,6 +5017,8 @@ async function _agentRunAnalysisPy() {
   _agentSurfacedCsvs.clear();
   _agentSurfacedPngs.clear();
   _agentShownFigB64.clear();
+  _agentPngSig.clear();
+  _agentCsvSig.clear();
   _agentDeleteGeneratedFiles();   // drop stale figs/tables so only analysis.py's own outputs surface
   const _rpT = document.getElementById('rp-tabs');
   const _rpP = document.getElementById('rp-panels');
@@ -5031,7 +5035,7 @@ async function _agentRunAnalysisPy() {
     // _agentSurfaceFigPngs) rather than the in-memory show-capture, so a figure that's both saved
     // and left open isn't added twice. Count only the newly-surfaced PNGs for the model summary.
     let newPngs = 0;
-    try { newPngs = _agentPyodide.FS.readdir('/sandbox').filter(f => /\.png$/i.test(f) && !_agentSurfacedPngs.has(f)).length; } catch(_) {}
+    newPngs = _agentChangedPngs().length;
     _agentRunResult = { stdout: stdout.trim(), stderr: '', exit: 0, figures: [] };
     _agentRenderResultsPanel();
     return { stdout: stdout.trim(), exit: 0, figures: newPngs + ' figure(s) produced' };
@@ -5045,12 +5049,21 @@ async function _agentRunAnalysisPy() {
 // ── Right-panel tab manager ────────────────────────────────────────
 let _rpItems = [];   // [{id, label, html}]
 
-function _rpAddItem(label, html) {
+function _rpAddItem(label, html, key) {
+  // Keyed items — a figure or table FILE — are updated IN PLACE when the same file comes back with new
+  // content. Refining a figure re-saves the same fig_x.png, and each version used to be appended as a
+  // new "Figure 3", "Figure 4"… of nearly the same plot (tables likewise).
+  if (key) {
+    const existing = _rpItems.find(i => i.key === key);
+    const panel = existing && document.getElementById(existing.id);
+    if (panel) { panel.innerHTML = html; _rpSelectTab(existing.id); return existing; }
+  }
   const empty = document.getElementById('agent-results-empty');
   if (empty) empty.remove();
 
   const id = 'rp-' + Date.now() + '-' + _rpItems.length;
-  _rpItems.push({ id, label });
+  const item = { id, label, key: key || null };
+  _rpItems.push(item);
 
   // Create panel div
   const panels = document.getElementById('rp-panels');
@@ -5070,6 +5083,7 @@ function _rpAddItem(label, html) {
   tabs.appendChild(btn);
 
   _rpSelectTab(id);   // auto-switch to newest
+  return item;
 }
 
 function _rpSelectTab(id) {
@@ -5095,14 +5109,17 @@ function _agentCodeDlLink() {
   if (!code.trim()) return '';
   return _agentDlLink('data:text/x-python;charset=utf-8,' + encodeURIComponent(code), 'sphere_analysis.py', 'Code (.py)');
 }
-function _agentPanelAddFigures(figs, stdout, stderr, exitCode) {
+function _agentPanelAddFigures(figs, stdout, stderr, exitCode, keys) {
   const codeLink = _agentCodeDlLink();
-  for (const b64 of figs) {
-    const n = _rpItems.filter(i => i.label.startsWith('Figure')).length + 1;
+  for (let fi = 0; fi < figs.length; fi++) {
+    const b64 = figs[fi];
+    const key = keys && keys[fi] ? keys[fi] : null;
+    const prev = key ? _rpItems.find(i => i.key === key) : null;
+    const n = prev ? prev.label.replace('Figure ', '') : _rpItems.filter(i => i.label.startsWith('Figure')).length + 1;
     let html = '<img src="data:image/png;base64,' + b64 + '" style="max-width:100%;display:block;border-radius:6px;">';
     html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + _agentDlLink('data:image/png;base64,' + b64, 'sphere_figure_' + n + '.png', 'PNG') + codeLink + '</div>';
     if (stdout && exitCode === 0) html += '<pre style="font-size:11px;color:#555;margin:.5rem 0 0;white-space:pre-wrap;word-break:break-all;">' + _escHtml(stdout) + '</pre>';
-    _rpAddItem('Figure ' + n, html);
+    _rpAddItem(prev ? prev.label : 'Figure ' + n, html, key);
   }
   // If no figures but there's meaningful stdout (e.g. a table), show as Output with a .txt (+ code) download.
   if (!figs.length && stdout && stdout !== '(no output)' && stdout.length > 10) {
@@ -5143,25 +5160,43 @@ function _agentDownscaleB64(b64, maxEdge) {
 // Surface any figure the agent saved as /sandbox/*.png (e.g. analysis.py's plt.savefig('fig_x.png')).
 // The plt.show() capture misses these because savefig()+close() never calls show — this is why the
 // agent sometimes reported figures that never appeared. Tracked so re-runs don't duplicate a figure.
-let _agentSurfacedPngs = new Set();
-let _agentShownFigB64  = new Set();   // content hashes of figures already shown (dedupe same plot re-saved)
-function _agentSurfaceFigPngs() {
-  if (!_agentPyodide) return;
+// Cheap content signature (FNV-1a over bytes or text) — tells a file re-saved with NEW content apart from
+// an unchanged one, without keeping every version of every image around.
+function _agentSig(data) {
+  let h = 0x811c9dc5;
+  const isStr = typeof data === 'string';
+  for (let i = 0; i < data.length; i++) { h ^= isStr ? data.charCodeAt(i) : data[i]; h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(36) + ':' + data.length;
+}
+let _agentPngSig = new Map();   // filename -> signature of the version currently shown in the panel
+let _agentCsvSig = new Map();
+// Figure files that are new, or were re-saved with different content, since they were last shown.
+function _agentChangedPngs() {
+  if (!_agentPyodide) return [];
   let files = [];
-  try { files = _agentPyodide.FS.readdir('/sandbox').filter(f => /\.png$/i.test(f)); } catch (_) { return; }
+  try { files = _agentPyodide.FS.readdir('/sandbox').filter(f => /\.png$/i.test(f)); } catch (_) { return []; }
+  const out = [];
   for (const f of files) {
-    if (_agentSurfacedPngs.has(f)) continue;
     let bytes;
     try { bytes = _agentPyodide.FS.readFile('/sandbox/' + f); } catch (_) { continue; }
     if (!bytes || !bytes.length) continue;
+    if (_agentPngSig.get(f) !== _agentSig(bytes)) out.push({ f, bytes });
+  }
+  return out;
+}
+let _agentSurfacedPngs = new Set();
+let _agentShownFigB64  = new Set();   // content hashes of figures already shown (dedupe same plot re-saved)
+function _agentSurfaceFigPngs() {
+  for (const { f, bytes } of _agentChangedPngs()) {
+    const isUpdate = _agentPngSig.has(f);
+    _agentPngSig.set(f, _agentSig(bytes));
     _agentSurfacedPngs.add(f);
-    // Dedupe by CONTENT, not just filename. The agent often saves the same plot again under a new name
-    // (e.g. an exploratory fig_x.png and then fig_x_final.png), which produced "Figure 1" and "Figure 2"
-    // of the identical chart. Skip a file whose bytes we've already shown this session.
     const b64 = _agentBytesToB64(bytes);
-    if (_agentShownFigB64.has(b64)) continue;
+    // A NEW file holding bytes already shown (the same plot saved again under another name, e.g.
+    // fig_x.png then fig_x_final.png) is skipped. A re-saved file updates its own panel item in place.
+    if (!isUpdate && _agentShownFigB64.has(b64)) continue;
     _agentShownFigB64.add(b64);
-    _agentPanelAddFigures([b64]);
+    _agentPanelAddFigures([b64], undefined, undefined, undefined, ['png:' + f]);
   }
 }
 
@@ -5173,12 +5208,17 @@ function _agentSurfaceTableCsvs() {
   let files = [];
   try { files = _agentPyodide.FS.readdir('/sandbox').filter(f => /^table_.*\.csv$/i.test(f)); } catch(_) { return; }
   for (const f of files) {
-    if (_agentSurfacedCsvs.has(f)) continue;
     let content = '';
     try { content = _agentPyodide.FS.readFile('/sandbox/' + f, { encoding: 'utf8' }); } catch(_) { continue; }
     if (!content.trim()) continue;
+    // Unchanged since it was shown → nothing to do. Re-saved with new content → update its item in place.
+    const sig = _agentSig(content);
+    if (_agentCsvSig.get(f) === sig) continue;
+    _agentCsvSig.set(f, sig);
     _agentSurfacedCsvs.add(f);
-    const n = _rpItems.filter(i => i.label.startsWith('Table')).length + 1;
+    const key = 'csv:' + f;
+    const prev = _rpItems.find(i => i.key === key);
+    const n = prev ? prev.label.replace('Table ', '') : _rpItems.filter(i => i.label.startsWith('Table')).length + 1;
     const url = 'data:text/csv;charset=utf-8,' + encodeURIComponent(content);
     const rows = content.trim().split('\n').slice(0, 15).map(r => r.split(','));
     let tbl = '<table style="border-collapse:collapse;font-size:11px;margin-top:8px;overflow-x:auto;display:block;">';
@@ -5187,7 +5227,7 @@ function _agentSurfaceTableCsvs() {
       tbl += '<tr>' + cells.map(c => '<' + tag + ' style="border:1px solid #e6dfd0;padding:3px 8px;text-align:left;white-space:nowrap;' + (ri === 0 ? 'background:#f8f1e2;font-weight:600;' : '') + '">' + _escHtml(c) + '</' + tag + '>').join('') + '</tr>';
     });
     tbl += '</table>';
-    _rpAddItem('Table ' + n, '<div style="display:flex;gap:6px;margin-bottom:6px;">' + _agentDlLink(url, f, 'CSV') + _agentCodeDlLink() + '</div>' + tbl);
+    _rpAddItem(prev ? prev.label : 'Table ' + n, '<div style="display:flex;gap:6px;margin-bottom:6px;">' + _agentDlLink(url, f, 'CSV') + _agentCodeDlLink() + '</div>' + tbl, key);
   }
 }
 function _agentRenderResultsPanel() {
@@ -5220,6 +5260,8 @@ function _agentClearResultsPanel() {
   _agentSurfacedCsvs.clear();
   _agentSurfacedPngs.clear();
   _agentShownFigB64.clear();
+  _agentPngSig.clear();
+  _agentCsvSig.clear();
   // Also delete the previous session's generated figure/table files. Marking them "already surfaced"
   // isn't enough: the final run_analysis_py step resets that tracking (so it can re-surface figures it
   // rewrites), after which the file scan would pick these stale files up again — which is why old
