@@ -877,6 +877,17 @@
   .agent-connect-btn { background:var(--cardinal); color:#fff; border:none; border-radius:8px; padding:.5rem 1.1rem; font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap; }
   .agent-connect-btn:hover { background:#6e1111; }
   .agent-note { font-size:11.5px; color:#999; }
+  /* Advanced (collapsed): key paste for billing to an institution's Anthropic account */
+  .agent-advanced { border:1px solid var(--border); border-radius:8px; padding:.6rem .8rem; }
+  .agent-advanced summary { cursor:pointer; font-size:12.5px; font-weight:600; color:var(--text-secondary); }
+  .agent-advanced[open] summary { margin-bottom:.6rem; }
+  .agent-advanced p, .agent-advanced .agent-key-row { margin:0 0 .6rem; }
+  /* Monthly usage-limit chip (status bar) */
+  .agent-ai-chip { border:1px solid var(--border); border-radius:20px; padding:.2rem .7rem; font-size:11.5px; color:var(--text-secondary); background:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:340px; min-width:0; flex-shrink:1; }
+  .agent-ai-chip.low { border-color:#c9a227; background:#fdf9ec; color:#5a4a12; }
+  .agent-ai-chip.out { border-color:#b23c3c; background:#fdecec; color:#7a1f1f; }
+  .agent-ai-more { font-size:11.5px; color:var(--cardinal); white-space:nowrap; text-decoration:none; }
+  .agent-ai-more:hover { text-decoration:underline; }
   .agent-chat-panel { display:none; flex-direction:column; flex:1; min-height:0; gap:.75rem; }
   .agent-status-bar { display:flex; align-items:center; gap:.6rem; flex-shrink:0; font-size:12.5px; color:var(--text-muted); background:#fafafa; border:1px solid var(--border); border-radius:8px; padding:.45rem .85rem; }
   .agent-status-dot { font-size:10px; }
@@ -1582,7 +1593,7 @@
           <div class="agent-setup-card" id="av-signin">
             <h3>Get started with SPHERE</h3>
             <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;padding:3px;background:#f4f2ee;margin-bottom:12px;"><button id="sm-signin" onclick="_authSetMode('signin')" style="border:none;padding:6px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:var(--cardinal);color:#fff;">Sign in</button><button id="sm-signup" onclick="_authSetMode('signup')" style="border:none;padding:6px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-secondary);">Create account</button></div>
-            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px;">Sign in to run the SPHERE AI Agent. New accounts get <strong>$10 in free credits</strong> to explore, while our launch pool lasts.</p>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px;">Sign in with your SPHERE account to use SPHERE AI.</p>
             <button class="agent-connect-btn" style="width:100%;background:#fff;color:var(--text-primary);border:1px solid var(--border);margin-bottom:8px;" onclick="_authOAuth('google')">Continue with Google</button>
             <button class="agent-connect-btn" style="width:100%;background:#fff;color:var(--text-primary);border:1px solid var(--border);margin-bottom:8px;" onclick="_authOAuth('microsoft')">Continue with Microsoft</button>
             <div style="text-align:center;color:var(--text-muted);font-size:12px;margin:8px 0;">or</div>
@@ -1595,15 +1606,24 @@
             <h3>Signing you in…</h3>
             <p style="font-size:12.5px;color:var(--text-secondary);margin-top:6px;">One moment while we load your account.</p>
           </div>
+          <!-- SPHERE AI runs on the sign-in (session). This card is shown only when Advanced is opened (the
+               chat's "Advanced" button, or an older Worker refusing the session); key paste lives in the
+               collapsed Advanced section. -->
           <div class="agent-setup-card" id="av-keys" style="display:none">
-            <h3>Connect your key</h3>
+            <h3>SPHERE AI</h3>
             <p style="font-size:12.5px;color:var(--text-secondary);margin:-4px 0 10px;"><span id="kp-signin"></span> · <a href="#" onclick="agentDisconnect();return false;" style="color:var(--cardinal);">Sign out</a></p>
-            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:10px;">Paste your <strong>SPHERE key</strong> (<code>sphere_…</code>) to spend your free credits, or your own <strong>Claude API key</strong> (<code>sk-ant-…</code>) to bill your Anthropic account. Either way, usage is tracked in your SPHERE account.</p>
-            <div class="agent-key-row">
-              <input type="text" id="agent-key-input" placeholder="sphere_…   or   sk-ant-…" autocomplete="new-password" spellcheck="false" onkeydown="if(event.key==='Enter')agentConnect()">
-              <button class="agent-connect-btn" onclick="agentConnect()">Connect</button>
-            </div>
-            <p class="agent-note">🔒 Stored only in this browser, never sent to Stanford.<br>Need a SPHERE key? <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one on the dashboard ↗</a> &nbsp;·&nbsp; Need a Claude key? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--cardinal);">Get one from Anthropic ↗</a></p>
+            <div id="kp-note" style="display:none;font-size:12.5px;color:#7a1f1f;background:#fdecec;border:1px solid #e3b3b3;border-radius:8px;padding:.55rem .75rem;line-height:1.5;"></div>
+            <button class="agent-connect-btn" onclick="_agentStartSession()">Continue with your SPHERE account</button>
+            <details id="agent-advanced" class="agent-advanced">
+              <summary>Advanced: bill AI usage to your institution's Anthropic account</summary>
+              <p>If your institution wants AI usage billed to its own Anthropic agreement, paste your institution's Anthropic API key (<code>sk-ant-…</code>). A SPHERE API key (<code>sphere_…</code>) from your dashboard can also go here; that uses your SPHERE AI usage limit, not your institution's account.</p>
+              <p>Requests still pass through SPHERE's proxy and SPHERE keeps the full conversation transcript; only billing moves to your institution. SPHERE's servers never keep that key (it is stored locally).</p>
+              <div class="agent-key-row">
+                <input type="text" id="agent-key-input" placeholder="sk-ant-…   or   sphere_…" autocomplete="new-password" spellcheck="false" onkeydown="if(event.key==='Enter')agentConnect()">
+                <button class="agent-connect-btn" onclick="agentConnect()">Connect</button>
+              </div>
+              <p class="agent-note">🔒 Stored only in this browser, never sent to Stanford.<br>SPHERE API key: <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">API keys tab on your dashboard ↗</a> &nbsp;·&nbsp; Anthropic API key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--cardinal);">Anthropic console ↗</a></p>
+            </details>
           </div>
           <div class="agent-setup-card" id="av-profile" style="display:none">
             <h3>One more step</h3>
@@ -1619,7 +1639,7 @@
           <div id="agent-about-panel" class="agent-about-panel">
             <span style="font-size:15px">🔒</span>
             <div class="agent-about-body" style="font-size:13px;color:var(--text-secondary);">
-              Your API key is stored only in this browser session and never sent to Stanford servers. All Python computation runs locally via Pyodide (WebAssembly).
+              Your sign-in (and any key you add under Advanced) is stored only in this browser session and never sent to Stanford servers. All Python computation runs locally via Pyodide (WebAssembly).
             </div>
             <button class="agent-about-close" onclick="agentToggleAbout()">×</button>
           </div>
@@ -1637,8 +1657,11 @@
               <option value="claude-sonnet-5">Sonnet 5 — balanced</option>
               <option value="claude-haiku-4-5">Haiku 4.5 — fastest</option>
             </select>
+            <span id="agent-ai-chip" class="agent-ai-chip" style="display:none;"></span>
+            <a id="agent-ai-more" class="agent-ai-more" href="https://app.sphereworld.ai/#request-more" target="_blank" rel="noopener" style="display:none;">Request a higher limit</a>
             <div class="agent-status-actions">
               <span id="agent-memory-badge" style="display:none;font-size:11px;color:#888;padding:.2rem .5rem;border:1px solid #ddd;border-radius:10px;cursor:pointer;" title="Clear memory" onclick="if(confirm('Clear all saved learnings?')){_agentClearLearnings();}"></span>
+              <button onclick="_agentOpenAdvanced()" title="Advanced: bill AI usage to your institution's Anthropic account">Advanced</button>
               <button onclick="agentReset()">↺ Reset</button>
               <button onclick="agentDisconnect()">Disconnect</button>
             </div>
@@ -1885,7 +1908,7 @@
             <div class="dua-full dua-key-field">
               <label for="dua-key">SPHERE API key <span style="color:var(--cardinal);">*</span></label>
               <input type="text" id="dua-key" class="dua-key-input" placeholder="sphere_…" autocomplete="off" spellcheck="false">
-              <div class="dua-key-hint">Sign in to download. Get a free key at <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">app.sphereworld.ai</a> — your acceptance and downloads are recorded under your account per the DUA.</div>
+              <div class="dua-key-hint">Signed in on the SPHERE AI Agent tab? That works too, with no key. Otherwise get a key at <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal);">app.sphereworld.ai</a> — your acceptance and downloads are recorded under your account per the DUA.</div>
             </div>
           </div>
 
@@ -2796,7 +2819,10 @@ async function _downloadGateInit() {
   // Prefill a key we already hold (agent session or prior sign-in) and check the account immediately.
   let key = (typeof _agentKey !== 'undefined' && _agentKey) || null;
   if (!key) { try { key = JSON.parse(sessionStorage.getItem('dua_agreed') || '{}').key || null; } catch (_) {} }
-  if (key) { if (kf && !kf.value) kf.value = key; await _downloadCheckKey(); }
+  if (key) { if (kf && !kf.value) kf.value = key; await _downloadCheckKey(); return; }
+  // No key: the SPHERE sign-in from the AI Agent tab is accepted as-is.
+  const tok = await _dlSessionToken();
+  if (tok) await _downloadCheckAuth(tok, true);
 }
 
 // When a valid key is present, ask the account: already signed → downloads; profile on file → just
@@ -2804,25 +2830,40 @@ async function _downloadGateInit() {
 async function _downloadCheckKey() {
   const kf = document.getElementById('dua-key'); const key = kf ? kf.value.trim() : '';
   if (!key.startsWith('sphere_')) {
+    // No key typed: a SPHERE sign-in (AI Agent tab) is accepted too.
+    const tok = await _dlSessionToken();
+    if (tok) return _downloadCheckAuth(tok, true);
     _dlDuaInfo = null; _setDownloadIdentityVisible(false); _dlSetAgreeVisible(false);
     const box = _dlStatusBox(); box.style.display = '';
-    box.innerHTML = 'Enter your SPHERE API key above to continue. Don\'t have one? <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">Register free</a> — your name and institution are saved to your account so you only agree to the DUA once.';
+    box.innerHTML = 'Sign in on the <a href="#" onclick="closeOverlay();showTab(\'agent\');return false;" style="color:var(--cardinal)">SPHERE AI Agent tab</a>, or enter your SPHERE API key above. Don\'t have an account? <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">Register free</a> — your name and institution are saved to your account so you only agree to the DUA once.';
     return;
   }
+  return _downloadCheckAuth(key, false);
+}
+// Asks the account behind `bearer` (a sphere_ key, or the session token when viaSession) for its DUA status.
+async function _downloadCheckAuth(bearer, viaSession) {
   let info;
   try {
-    const r = await fetch(SPHERE_API_BASE + '/dua?portal=adrc', { headers: { 'Authorization': 'Bearer ' + key } });
+    const r = await fetch(SPHERE_API_BASE + '/dua?portal=adrc', { headers: { 'Authorization': 'Bearer ' + bearer } });
     info = await r.json();
     if (!r.ok) {
       _setDownloadIdentityVisible(false); _dlSetAgreeVisible(false);
       const box = _dlStatusBox(); box.style.display = '';
-      box.innerHTML = 'That SPHERE key was not recognized — check it, or <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">register</a>.';
+      box.innerHTML = viaSession
+        ? 'Your SPHERE sign-in has expired — sign in again on the SPHERE AI Agent tab, or enter your SPHERE API key above.'
+        : 'That SPHERE key was not recognized — check it, or <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:var(--cardinal)">register</a>.';
       return;
     }
   } catch (_) { return; }
   _dlDuaInfo = info;
-  if (info.accepted) { _dlKey = key; document.getElementById('dua-gate').style.display = 'none'; document.getElementById('dl-section').style.display = 'block'; renderDownloadCards(); return; }
+  if (info.accepted) { _dlKey = viaSession ? null : bearer; document.getElementById('dua-gate').style.display = 'none'; document.getElementById('dl-section').style.display = 'block'; renderDownloadCards(); return; }
   _applyDownloadGateIdentity(info);
+}
+// Session token of the SPHERE sign-in (made on the AI Agent tab), or null if this browser tab has none.
+async function _dlSessionToken() {
+  try { if (!_session) _session = JSON.parse(sessionStorage.getItem('sphere_session') || 'null'); } catch (_) {}
+  if (!_session) return null;
+  try { return await _authToken(); } catch (_) { return null; }
 }
 
 // DUA acceptance + downloads are recorded in the SPHERE backend (Worker), tied to the signed-in
@@ -2867,7 +2908,10 @@ async function submitDUA() {
   const agree = g('dua-agree').checked;
   const errEl = g('dua-error');
   const fail  = m => { errEl.textContent = m; errEl.style.display = 'block'; };
-  if (!key.startsWith('sphere_')) return fail('Please enter your SPHERE API key to sign in. Get a free one at app.sphereworld.ai.');
+  // A sphere_ key if one was entered, otherwise the SPHERE sign-in from the AI Agent tab.
+  const viaKey = key.startsWith('sphere_');
+  const bearer = viaKey ? key : await _dlSessionToken();
+  if (!bearer) return fail('Please sign in on the SPHERE AI Agent tab, or enter your SPHERE API key (get one at app.sphereworld.ai).');
   if (!agree) return fail('Please read and agree to the Data Use Agreement to proceed.');
   errEl.style.display = 'none';
 
@@ -2877,20 +2921,21 @@ async function submitDUA() {
   try {
     // No fields — the key's account already has the identity (from registration). Just record consent.
     const r = await fetch(SPHERE_API_BASE + '/dua/accept', {
-      method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + bearer, 'Content-Type': 'application/json' },
       body: JSON.stringify({ portal: 'adrc', channel: 'download' }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       setBtn('Agree & Access Downloads', false);
       if (d && d.error === 'missing_profile') return fail('Your account is missing profile details. Please complete them at app.sphereworld.ai, then return.');
-      return fail(d && d.error === 'unauthorized' ? 'That SPHERE key was not recognized — check it and try again.' : 'Could not record your agreement — please try again.');
+      if (d && d.error === 'unauthorized') return fail(viaKey ? 'That SPHERE key was not recognized — check it and try again.' : 'Your SPHERE sign-in has expired — sign in again on the SPHERE AI Agent tab.');
+      return fail('Could not record your agreement — please try again.');
     }
   } catch (_) { setBtn('Agree & Access Downloads', false); return fail('Network error — please try again.'); }
   setBtn('Agree & Access Downloads', false);
 
-  _dlKey = key;
-  sessionStorage.setItem('dua_agreed', JSON.stringify({ key, ts: Date.now() }));
+  _dlKey = viaKey ? key : null;   // null = passed with the sign-in; logging then uses the session token
+  sessionStorage.setItem('dua_agreed', JSON.stringify({ key: _dlKey, ts: Date.now() }));
   try { gtag('event', 'dua_agreed', {}); } catch (_) {}
   g('dua-gate').style.display = 'none';
   g('dl-section').style.display = 'block';
@@ -2900,14 +2945,18 @@ async function submitDUA() {
 // Best-effort audit log of a bulk download (tied to the signed-in account, per the DUA).
 function _dlLogAccess(dataset) {
   if (!_dlKey) { try { _dlKey = (JSON.parse(sessionStorage.getItem('dua_agreed') || '{}').key) || null; } catch (_) {} }
-  if (!_dlKey) return;
-  try {
-    fetch(SPHERE_API_BASE + '/data-access', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + _dlKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ portal: 'adrc', channel: 'bulk_download', detail: String(dataset || 'download') }),
-    }).catch(() => {});
-  } catch (_) { /* best-effort */ }
+  const send = (bearer) => {
+    if (!bearer) return;
+    try {
+      fetch(SPHERE_API_BASE + '/data-access', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + bearer, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portal: 'adrc', channel: 'bulk_download', detail: String(dataset || 'download') }),
+      }).catch(() => {});
+    } catch (_) { /* best-effort */ }
+  };
+  // The key the gate was passed with; otherwise the SPHERE sign-in.
+  if (_dlKey) send(_dlKey); else _dlSessionToken().then(send, () => {});
 }
 
 function revokeDUA() {
@@ -4303,12 +4352,13 @@ function agentTabOpened() {
   _authLoad();
   if (_authHandleOAuthReturn()) { _postSignIn(); return; }
   if (!_session) { _authView('av-signin'); return; }
-  // Signed in — restore a previously chosen key, else show the key panel.
-  _billingMode = sessionStorage.getItem('sphere_billing') || 'credits';
+  // Signed in — restore a key chosen under Advanced; otherwise SPHERE AI runs on the sign-in itself.
+  _billingMode = sessionStorage.getItem('sphere_billing') || 'session';
   const sk = sessionStorage.getItem('agent_key');
   const bk = sessionStorage.getItem('byok_key');
   if (bk) { _byokKey = bk; _agentKey = sk || null; _billingMode = 'byok'; _agentShowChat(); agentEnsurePyodide(); return; }
   if (sk) { _agentKey = sk; _billingMode = 'credits'; _agentShowChat(); agentEnsurePyodide(); return; }
+  if (_agentDuaOk) { _agentStartSession(); return; }   // already onboarded on this page load
   _postSignIn();
 }
 
@@ -4321,14 +4371,14 @@ function agentToggleAbout() {
 // ═══════════════════════ SPHERE sign-in + billing (BYOK) ═══════════════════════
 const _AUTH_BASE = 'https://api.butterbase.ai/auth/app_wvujnt4zpp55';
 let _session = null;             // { access_token, refresh_token, expires_at, user }
-let _billingMode = 'credits';    // 'credits' | 'byok'
+let _billingMode = 'session';    // 'session' (SPHERE sign-in) | 'credits' (sphere_ key, Advanced) | 'byok' (Advanced)
 let _byokKey = null;             // user's Anthropic key (BYOK, in-browser only)
 let _authMode = 'signin';        // 'signin' | 'signup'
 let _agentDuaOk = false;         // true once DUA accepted (at sign-in onboarding); lets extract_data skip its re-check
 
 function _authLoad(){
   try { _session = JSON.parse(sessionStorage.getItem('sphere_session') || 'null'); } catch(_) { _session = null; }
-  _billingMode = sessionStorage.getItem('sphere_billing') || 'credits';
+  _billingMode = sessionStorage.getItem('sphere_billing') || 'session';
   _byokKey = sessionStorage.getItem('byok_key') || null;
 }
 function _authSave(d){
@@ -4343,6 +4393,12 @@ function _authSignOut(){ _session=null; _byokKey=null; _agentDuaOk=false;
 async function _authToken(){
   if (!_session) throw new Error('not signed in');
   if (_session.expires_at - Date.now() > 60000) return _session.access_token;
+  return _authRefresh();
+}
+// Swaps the refresh token for a new session now, whatever the expiry says (also after the Worker refuses a
+// token that has not expired). A refused refresh signs out.
+async function _authRefresh(){
+  if (!_session) throw new Error('not signed in');
   const r = await fetch(_AUTH_BASE + '/refresh', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ refresh_token: _session.refresh_token }) });
   if (!r.ok) { _authSignOut(); throw new Error('session expired'); }
   _authSave(await r.json()); return _session.access_token;
@@ -4456,11 +4512,11 @@ async function _postSignIn(){
     const r = await fetch(SPHERE_API_BASE + '/dua?portal=' + _AGENT_PORTAL, { headers: { Authorization: 'Bearer ' + t } });
     if (r.ok) {
       const info = await r.json();
-      if (info.accepted || info.dua_configured === false) { _agentDuaOk = true; _authView('av-keys'); return; }
+      if (info.accepted || info.dua_configured === false) { _agentDuaOk = true; _agentStartSession(); return; }
       _authShowOnboarding(info); return;
     }
   } catch(_) { /* non-blocking */ }
-  _authView('av-keys');
+  _agentStartSession();
   _sphereApplyDashLinks();
 }
 // Build + show the combined "profile + DUA" onboarding card. Profile fields appear only when the profile
@@ -4512,7 +4568,7 @@ async function _authAcceptOnboarding(){
     const payload={ portal:_AGENT_PORTAL, channel:'agent' }; if(fields) payload.fields=fields;
     const r=await fetch(SPHERE_API_BASE+'/dua/accept',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!r.ok){ setErr('Could not record acceptance — please try again.'); return; }
-    _agentDuaOk=true; _authView('av-keys');
+    _agentDuaOk=true; _agentStartSession();
   } catch(e){ setErr('Network error — please try again.'); }
   finally { if(btn){ btn.disabled=false; btn.textContent='Agree & Continue'; } }
 }
@@ -4528,9 +4584,12 @@ async function _sendBeacon(usage, model){
   } catch(_){}
 }
 
-// Build headers for a Worker /v1-messages call. Credits => the sphere_ key. BYOK => a SPHERE session
-// token (identity) + the user's Anthropic key in x-sphere-byok, so the Worker runs the call with THEIR
-// key and meters it + stores the transcript exactly like credits — no client-side beacon, no double count.
+// Build headers for a Worker /v1-messages call. Default => the SPHERE session token (SPHERE AI runs on the
+// sign-in). A sphere_ key pasted under Advanced => that key. BYOK (Advanced) => the session token
+// (identity) + the institution's Anthropic key in x-sphere-byok, so the Worker runs the call with THAT
+// key and meters it + stores the transcript the same way — no client-side beacon, no double count.
+// Shown when the Worker refuses the sign-in itself (revoked, or its refresh refused): signing in again fixes it.
+const _AGENT_RESIGNIN = 'Your SPHERE sign-in has expired. Click Disconnect, then sign in again.';
 async function _agentReqHeaders(){
   const h = { 'content-type': 'application/json' };
   if (_billingMode === 'byok' && _byokKey) {
@@ -4538,8 +4597,12 @@ async function _agentReqHeaders(){
     if (tok) h['Authorization'] = 'Bearer ' + tok;
     else if (_agentKey && _agentKey.startsWith('sphere_')) h['Authorization'] = 'Bearer ' + _agentKey;
     h['x-sphere-byok'] = _byokKey;
-  } else {
+  } else if (_agentKey) {
     h['Authorization'] = 'Bearer ' + _agentKey;
+  } else {
+    let tok = null; try { tok = await _authToken(); } catch(_){}
+    if (!tok) throw new Error(_AGENT_RESIGNIN);
+    h['Authorization'] = 'Bearer ' + tok;
   }
   return h;
 }
@@ -4589,68 +4652,152 @@ document.addEventListener('click', function(e){
 // No-op shim so existing call sites stay valid.
 function _sphereApplyDashLinks(){ /* handled by the delegated click listener above */ }
 
-// True once the agent is connected in EITHER mode (credits: a sphere_ key; BYOK: the user's Anthropic key).
-function _agentReady(){ return !!(_agentKey || (_billingMode === 'byok' && _byokKey)); }
-// Bearer for SPHERE-authed side calls (DUA accept, data-access logging): the sphere_ key in credits mode,
-// or the SPHERE session token in BYOK mode (those endpoints accept a session JWT too). Null if neither.
+// True once the agent can call SPHERE AI: signed in (session), or a key chosen under Advanced.
+function _agentReady(){ return !!(_agentKey || (_billingMode === 'byok' && _byokKey) || (_billingMode === 'session' && _session)); }
+// Bearer for SPHERE-authed side calls (DUA accept, data-access logging): a sphere_ key pasted under
+// Advanced, else the SPHERE session token (those endpoints accept a session JWT too). Null if neither.
 async function _agentAuthBearer(){
   if (_agentKey) return _agentKey;
   try { return await _authToken(); } catch(_) { return null; }
 }
 
-// ── Low-balance warning (credits mode) ─────────────────────────────
-// After each turn, check the SPHERE wallet balance and warn before it runs dry — so a long
-// analysis doesn't die mid-way. Offers an inline switch to the user's own Claude key to continue.
+// ── Usage-limit chip / low-balance warning ─────────────────────────
+// When the chat opens and after each turn, read /account. While the monthly usage limit is enforced
+// (ai.enforced) the status-bar chip shows the current ai.state in short form, plus a notice above the
+// input for states that need one. Otherwise it's the plain wallet check that warns before credit runs
+// dry (no key prompt here; keys live under Advanced). BYOK turns count toward neither, so nothing shows.
 let _agentLowBalDismissed = false;
 const _AGENT_LOWBAL_THRESHOLD = 2.00;   // USD — warn at/below this
+const _AGENT_REQUEST_MORE_URL = 'https://app.sphereworld.ai/#request-more';
+let _agentAi = null;           // last /account → ai while enforced; null = not loaded, or not enforced
+let _agentAiDismissed = null;  // the ai.state whose notice the user dismissed
+// Whether "Request a higher limit" may be offered (plan §2.7): enforced, a state that offers it, and a
+// request the Worker would take — none sent yet, or one declined with a second still allowed this month
+// (at most one open request, none after a grant). The Worker counts the month's requests as
+// request.requests_month; without it a decline allows none, so no request is offered that would get a 409.
+function _agentAiCanRequest(ai) {
+  if (!ai || ai.enforced !== true || ['ok', 'low', 'exhausted', 'on_credit'].indexOf(ai.state) < 0) return false;
+  const r = ai.request || {}, st = r.status || 'none';
+  if (st === 'none') return true;
+  return st === 'declined' && typeof r.requests_month === 'number' && r.requests_month < 2;
+}
 async function _agentCheckBalance() {
-  if (_billingMode !== 'credits' || _agentLowBalDismissed) return;
+  if (_billingMode === 'byok') { _agentAi = null; _agentRenderAi(null); return; }
   let tok = null; try { tok = await _authToken(); } catch(_) {}
   if (!tok) return;
-  let bal = NaN;
+  let d;
   try {
     const r = await fetch(SPHERE_API_BASE + '/account', { headers: { Authorization: 'Bearer ' + tok } });
     if (!r.ok) return;
-    const d = await r.json();
-    bal = Number(d && d.wallet && d.wallet.balance_usd);
+    d = await r.json();
   } catch(_) { return; }
+  if (d && d.ai && d.ai.enforced === true) { _agentAi = d.ai; _agentRenderAi(d.ai); return; }
+  _agentAi = null; _agentRenderAi(null);
+  if (_agentLowBalDismissed) return;
+  const bal = Number(d && d.wallet && d.wallet.balance_usd);
   if (!isFinite(bal)) return;
   const el = document.getElementById('agent-lowbal');
   if (!el) return;
   if (bal > _AGENT_LOWBAL_THRESHOLD) { el.style.display = 'none'; return; }
   const out = bal <= 0;
-  el.style.borderColor = (bal <= 0.5) ? '#b23c3c' : '#c9a227';
-  el.style.background  = (bal <= 0.5) ? '#fdecec' : '#fdf9ec';
-  el.style.color       = (bal <= 0.5) ? '#7a1f1f' : '#5a4a12';
+  _agentBanner(el, bal <= 0.5 ? 'out' : 'low');
   el.innerHTML =
-    '<div style="margin-bottom:.45rem;">' +
-      (out ? '⚠️ <strong>Your SPHERE credits are used up.</strong> '
-           : '⚠️ <strong>Low balance: $' + bal.toFixed(2) + ' left.</strong> ') +
-      'To keep going without losing this conversation, continue on your own Claude API key — usage then bills to your Anthropic account.' +
+    '<div style="margin-bottom:.45rem;">⚠️ ' +
+      (out ? '<strong>No SPHERE credits are left on this account.</strong> '
+           : '<strong>Low balance: $' + bal.toFixed(2) + ' left.</strong> ') +
+      'You can add credit on your <a href="https://app.sphereworld.ai" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">dashboard</a>.' +
     '</div>' +
     '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
-      '<input id="agent-lowbal-key" type="password" placeholder="sk-ant-…" spellcheck="false" autocomplete="off" ' +
-        'style="flex:1;min-width:170px;padding:6px 9px;border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:12px;" ' +
-        'onkeydown="if(event.key===\'Enter\')_agentSwitchToByok()">' +
-      '<button onclick="_agentSwitchToByok()" style="border:none;cursor:pointer;font-weight:600;font-size:12px;border-radius:6px;padding:6px 12px;background:var(--cardinal);color:#fff;">Continue with my key</button>' +
       '<button onclick="_agentDismissLowBal()" style="border:none;cursor:pointer;font-size:12px;border-radius:6px;padding:6px 10px;background:transparent;color:inherit;">Dismiss</button>' +
     '</div>';
   el.style.display = '';
 }
 function _agentDismissLowBal() {
-  _agentLowBalDismissed = true;
-  const el = document.getElementById('agent-lowbal'); if (el) el.style.display = 'none';
+  const el = document.getElementById('agent-lowbal');
+  if (el && el.dataset.ai) _agentAiDismissed = el.dataset.ai; else _agentLowBalDismissed = true;
+  if (el) el.style.display = 'none';
 }
-// Switch this live session from SPHERE credits to the user's own Claude key without losing context.
-function _agentSwitchToByok() {
-  const inp = document.getElementById('agent-lowbal-key');
-  const k = (inp && inp.value || '').trim();
-  if (!/^sk-ant-/.test(k)) { alert('Enter your Claude API key (it starts with sk-ant-).'); return; }
-  _byokKey = k; _billingMode = 'byok';
-  sessionStorage.setItem('byok_key', k);
-  sessionStorage.setItem('sphere_billing', 'byok');
-  _agentDismissLowBal();
-  agentAppendMessage('assistant', '✓ Switched to your own Claude API key — you can keep going. Usage now bills to your Anthropic account (and is still tracked in your SPHERE account).');
+function _agentBanner(el, tone) {
+  const c = tone === 'out' ? ['#b23c3c', '#fdecec', '#7a1f1f'] : tone === 'low' ? ['#c9a227', '#fdf9ec', '#5a4a12'] : ['#c8d8ff', '#f0f4ff', '#33427a'];
+  el.style.borderColor = c[0]; el.style.background = c[1]; el.style.color = c[2];
+}
+// "1 Nov 2026", or "1 Nov 2026, 00:00 UTC" with the time (resets fall on a UTC midnight).
+function _agentAiDate(iso, withTime) {
+  const d = new Date(iso || '');
+  if (isNaN(d.getTime())) return '';
+  const s = d.getUTCDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+  return withTime ? s + ', ' + String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0') + ' UTC' : s;
+}
+// Renders `ai` (the /account block; null = not enforced) as the chip, and a notice for the states that
+// need one. Copy follows the plan's §2.8 table: users see a percentage and a reset date, never an amount
+// of the limit; "Request a higher limit" only where the table offers it.
+function _agentRenderAi(ai) {
+  const chip = document.getElementById('agent-ai-chip'), more = document.getElementById('agent-ai-more');
+  const el = document.getElementById('agent-lowbal');
+  const hideNotice = (any) => { if (el && (any || el.dataset.ai)) { el.style.display = 'none'; delete el.dataset.ai; } };
+  const hideAll = () => { if (chip) chip.style.display = 'none'; if (more) more.style.display = 'none'; hideNotice(false); };
+  // Cloud analysis (/ma/run) is outside the usage limit and needs earlier credit: hide any such control
+  // when enforced and credit is under $0.10. (This page has no such control yet; the hook covers one.)
+  const noCloud = !!(ai && ai.enforced && !(Number(ai.wallet_credit_usd) >= 0.10));
+  document.querySelectorAll('[data-cloud-analysis]').forEach(c => { c.hidden = noCloud; });
+  if (!ai || !ai.enforced || !ai.state) { hideAll(); return; }
+  const s = ai.state;
+  const pct = Math.max(0, Math.min(100, Math.round(Number(ai.used_pct) || 0)));
+  const resets = _agentAiDate(ai.resets_at, true), resetsShort = _agentAiDate(ai.resets_at, false);
+  const until = _agentAiDate(ai.paused_until || ai.resets_at, true), untilShort = _agentAiDate(ai.paused_until || ai.resets_at, false);
+  const credit = Number(ai.wallet_credit_usd) || 0;
+  const creditTxt = credit > 0 ? ' ($' + credit.toFixed(2) + ')' : '';
+  let short, long, tone = '', notice = true, offer = false;
+  if (s === 'ok' || s === 'low') {
+    short = pct + '% of monthly limit used · Resets ' + resetsShort;
+    long = 'SPHERE AI: ' + pct + '% of your monthly usage limit used. Resets ' + resets + '.' + (s === 'low' ? ' Approaching your limit.' : '');
+    tone = s === 'low' ? 'low' : ''; notice = false; offer = true;
+  } else if (s === 'exhausted') {
+    short = 'Limit reached · Resets ' + resetsShort;
+    long = "You've reached your monthly SPHERE AI usage limit. It resets " + resets + '.';
+    tone = 'out'; offer = true;
+  } else if (s === 'on_credit') {
+    short = 'Limit reached · using earlier credit' + creditTxt;
+    long = "You've reached your monthly usage limit. Next turns use your earlier credit" + creditTxt + '. Your limit resets ' + resets + '.';
+    tone = 'low'; offer = true;
+  } else if (s === 'paused_global') {
+    short = 'Paused until ' + untilShort;
+    long = "This month's research capacity is reached. SPHERE AI resumes " + until + '.' + (credit > 0 ? ' Your earlier credit still works.' : '');
+    tone = 'out';
+  } else if (s === 'unverified') {
+    short = long = 'Verify your email to start using SPHERE AI free, within a monthly usage limit.';
+  } else if (s === 'not_eligible') {
+    short = long = ai.reason === 'disposable_email'
+      ? 'Free SPHERE AI needs a permanent email address.'
+      : 'This email address already has free SPHERE AI on another account (+tags and Gmail dots count as the same address). Sign in with that account, or contact us if this is a mistake.';
+  } else { hideAll(); return; }
+  if (!_agentAiCanRequest(ai)) offer = false;
+  if (chip) { chip.textContent = short; chip.title = long; chip.className = 'agent-ai-chip' + (tone ? ' ' + tone : ''); chip.style.display = ''; }
+  if (more) more.style.display = offer ? '' : 'none';
+  if (!el) return;
+  if (!notice || _agentAiDismissed === s) { hideNotice(true); return; }
+  _agentBanner(el, tone || 'info');
+  el.dataset.ai = s;
+  el.innerHTML = '<div style="margin-bottom:.45rem;">' + _escHtml(long) + '</div>' +
+    '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+      (offer ? '<a href="' + _AGENT_REQUEST_MORE_URL + '" target="_blank" rel="noopener" style="text-decoration:none;font-weight:600;font-size:12px;border-radius:6px;padding:6px 12px;background:var(--cardinal);color:#fff;">Request a higher limit</a>' : '') +
+      '<button onclick="_agentDismissLowBal()" style="border:none;cursor:pointer;font-size:12px;border-radius:6px;padding:6px 10px;background:transparent;color:inherit;">Dismiss</button>' +
+    '</div>';
+  el.style.display = '';
+}
+// The Worker's closing `sphere` stream event carries `allowance` {used_pct, state, next} on turns gated
+// while the limit is enforced. next "credit" = the limit is used up and earlier credit pays from now on;
+// "none" = used up with no credit. Either notice shows before the next turn.
+function _agentOnStreamAi(a) {
+  if (!a || typeof a !== 'object') return;
+  if (!_agentAi || !_agentAi.resets_at) { _agentCheckBalance(); return; }   // need the reset date first
+  const ai = Object.assign({}, _agentAi);
+  if (a.state) ai.state = a.state;
+  if (isFinite(Number(a.used_pct))) ai.used_pct = Number(a.used_pct);
+  if (a.next === 'credit') ai.state = 'on_credit';
+  else if (a.next === 'none') ai.state = 'exhausted';
+  _agentAi = ai;
+  _agentRenderAi(ai);
 }
 
 async function agentConnect() {
@@ -4662,14 +4809,15 @@ async function agentConnect() {
     _byokKey = key; _agentKey = null; _billingMode = 'byok';
     sessionStorage.setItem('byok_key', key); sessionStorage.setItem('sphere_billing', 'byok'); sessionStorage.removeItem('agent_key');
   } else {
-    alert('Enter your SPHERE key (starts with sphere_) or your Claude API key (starts with sk-ant-).'); return;
+    alert('Enter your institution\'s Anthropic API key (starts with sk-ant-) or a SPHERE API key (starts with sphere_).'); return;
   }
   _agentShowChat();
   await agentEnsurePyodide();
 }
 
 function agentDisconnect() {
-  _agentKey = null; _byokKey = null; _billingMode = 'credits';
+  _agentKey = null; _byokKey = null; _billingMode = 'session';
+  _agentAi = null; _agentAiDismissed = null; _agentRenderAi(null);
   sessionStorage.removeItem('agent_key'); sessionStorage.removeItem('byok_key'); sessionStorage.removeItem('sphere_billing');
   try { _authSignOut(); } catch(_){}
   document.getElementById('agent-setup-panel').style.display = '';
@@ -4721,6 +4869,33 @@ function _agentShowChat() {
   if (layout) layout.classList.add('connected');
   const header = document.querySelector('.agent-header');
   if (header) header.style.display = 'none';
+  _agentCheckBalance();   // usage-limit chip (or wallet check) for this account
+}
+
+// Default path: SPHERE AI runs on the SPHERE sign-in (session Bearer), with no key to paste. Clears any
+// key chosen under Advanced; the conversation is kept.
+function _agentStartSession() {
+  _agentKey = null; _byokKey = null; _billingMode = 'session';
+  sessionStorage.removeItem('agent_key'); sessionStorage.removeItem('byok_key'); sessionStorage.setItem('sphere_billing', 'session');
+  _agentShowChat();
+  agentEnsurePyodide();
+}
+
+// Shows the setup card with Advanced (key paste) expanded: from the chat's "Advanced" button, or with a
+// `note` when an older Worker refuses the session on chat. The conversation is kept, so connecting a key
+// returns to the same chat.
+function _agentOpenAdvanced(note) {
+  document.getElementById('agent-setup-panel').style.display = '';
+  document.getElementById('agent-chat-panel').style.display = 'none';
+  const layout = document.querySelector('.agent-layout');
+  if (layout) layout.classList.remove('connected');
+  const header = document.querySelector('.agent-header');
+  if (header) header.style.display = '';
+  const email = (_session && _session.user && (_session.user.email || _session.user.display_name)) || '';
+  const who = document.getElementById('kp-signin'); if (who) who.textContent = email ? ('Signed in as ' + email) : 'Signed in';
+  const n = document.getElementById('kp-note'); if (n) { n.textContent = note || ''; n.style.display = note ? '' : 'none'; }
+  const adv = document.getElementById('agent-advanced'); if (adv) adv.open = true;
+  _authView('av-keys');
 }
 
 // ── Pyodide setup ─────────────────────────────────────────────────
@@ -5458,6 +5633,37 @@ function _agentCachedMessages() {
   return msgs;
 }
 
+// ── Worker refusals ────────────────────────────────────────────────
+function _agentErrCode(err) { return (err && ((err.error && err.error.code) || err.code)) || ''; }
+function _agentSleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    if (signal) signal.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
+  });
+}
+// Text for a Worker refusal: its top-level `message` (the plan's §2.8 line, never a code or JSON). An
+// older Worker's 402 has none, so show the neutral no-credit line rather than its old text.
+function _agentRefusalText(status, err) {
+  const top = err && typeof err.message === 'string' ? err.message.trim() : '';
+  if (top) return top;
+  if (_agentErrCode(err) && err.error && err.error.message) return String(err.error.message);
+  if (status === 402 || (err && err.error && err.error.type === 'insufficient_credits')) return 'No SPHERE credits are left on this account. You can add credit on your dashboard.';
+  return '';
+}
+function _agentRefusalError(msg, offerMore) { const e = new Error(msg); e.sphereRefusal = true; e.offerMore = !!offerMore; return e; }
+// A refusal in the transcript: its line, plus "Request a higher limit" where §2.8 offers it and the
+// account's request status still allows one (_agentAiCanRequest).
+function _agentAppendRefusal(msg, offerMore) {
+  agentAppendMessage('assistant', '⚠️ ' + msg);
+  if (!offerMore || !_agentAiCanRequest(_agentAi)) return;
+  const bubbles = document.querySelectorAll('#agent-messages .agent-msg.assistant .agent-msg-bubble');
+  const b = bubbles[bubbles.length - 1]; if (!b) return;
+  const a = document.createElement('a');
+  a.href = _AGENT_REQUEST_MORE_URL; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Request a higher limit';
+  a.style.cssText = 'display:inline-block;margin-top:.4rem;text-decoration:none;font-weight:600;font-size:12px;border-radius:6px;padding:6px 12px;background:var(--cardinal);color:#fff;';
+  b.appendChild(a);
+}
+
 // ── streaming API call ─────────────────────────────────────────────
 // Makes one API call with stream:true. Streams text tokens to the DOM
 // with a 20ms flush interval so words appear progressively.
@@ -5465,7 +5671,8 @@ function _agentCachedMessages() {
 async function _agentStreamCall() {
   const _reqT0 = performance.now();     // [latency diag] request start
   let _firstByteT = 0, _usage = null;   // [latency diag] first SSE byte + token usage
-  const resp = await fetch(SPHERE_API_BASE + '/v1-messages?conversation_id=' + _agentConvoId(), {
+  // ?portal=adrc tags the turn as ADRC-portal use on the account.
+  const send = async () => fetch(SPHERE_API_BASE + '/v1-messages?portal=' + _AGENT_PORTAL + '&conversation_id=' + _agentConvoId(), {
     method: 'POST',
     signal: _agentAbort.signal,
     headers: await _agentReqHeaders(),
@@ -5485,13 +5692,33 @@ async function _agentStreamCall() {
       messages: _agentCachedMessages()
     })
   });
+  let resp = await send();
+  // 401 on the sign-in: the Worker can refuse a token before its expiry (revoked, rotated). Refresh it and
+  // send once more; a refused refresh has signed out, so the fix is to sign in again.
+  if (resp.status === 401 && _billingMode === 'session') {
+    try { await _authRefresh(); resp = await send(); }
+    catch (_) { if (!_session) throw _agentRefusalError(_AGENT_RESIGNIN, false); }
+  }
+  // 429 allowance_busy = several turns already in flight (not the usage limit): wait 5 s, retry once.
+  if (resp.status === 429 && _agentErrCode(await resp.clone().json().catch(() => ({}))) === 'allowance_busy') {
+    await _agentSleep(5000, _agentAbort.signal);
+    resp = await send();
+  }
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    // Out of SPHERE credits → actionable nudge instead of a raw API error.
-    if (resp.status === 402 || err.error?.type === 'insufficient_credits') {
-      throw new Error("Your $10 in free research credits are used up. Click Disconnect, then choose \u2018Bring your own Anthropic key\u2019 to keep going \u2014 at no cost.");
+    // Still 401 after a fresh token. Worker v4 accepts the sign-in on chat and refuses it with its own
+    // sentence (a top-level `message`, or an error.code): the session itself was rejected, so sign in again.
+    // Only an older Worker, which takes a key alone on chat, answers without either: open Advanced to paste one.
+    if (resp.status === 401 && _billingMode === 'session') {
+      if ((typeof err.message === 'string' && err.message.trim()) || _agentErrCode(err)) throw _agentRefusalError(_AGENT_RESIGNIN, false);
+      const note ="SPHERE AI couldn't start with your sign-in alone. Under Advanced, paste a SPHERE API key from your dashboard or your institution's Anthropic API key, then send your message again.";
+      _agentOpenAdvanced(note);
+      throw _agentRefusalError(note, false);
     }
+    // Refusals by error.code: show the Worker's message; only allowance_exhausted offers a higher limit.
+    const msg = _agentRefusalText(resp.status, err);
+    if (msg) throw _agentRefusalError(msg, _agentErrCode(err) === 'allowance_exhausted');
     throw new Error('API error ' + resp.status + ': ' + (err.error?.message || resp.statusText));
   }
   const _ttfbMs = performance.now() - _reqT0;   // [latency diag] time to response headers
@@ -5620,6 +5847,9 @@ async function _agentStreamCall() {
       } else if (ev.type === 'message_delta') {
         if (ev.delta.stop_reason) stop_reason = ev.delta.stop_reason;
         if (ev.usage) _usage = Object.assign({}, _usage, ev.usage);         // [latency diag] output tokens
+      } else if (ev.sphere) {
+        // The Worker's closing event; `allowance` is present only on turns gated while the limit is enforced.
+        if (ev.sphere.allowance) _agentOnStreamAi(ev.sphere.allowance);
       }
     }
   }
@@ -5763,8 +5993,9 @@ async function agentLoop() {
   } catch(e) {
     const thinking = document.getElementById('agent-thinking');
     if (thinking) thinking.remove();
-    if (e.name !== 'AbortError') agentAppendMessage('assistant', '⚠️ Error: ' + e.message);
-    else agentAppendMessage('assistant', '⏹ Stopped.');
+    if (e.name === 'AbortError') agentAppendMessage('assistant', '⏹ Stopped.');
+    else if (e.sphereRefusal) _agentAppendRefusal(e.message, e.offerMore);
+    else agentAppendMessage('assistant', '⚠️ Error: ' + e.message);
     agentAppendTurnBreak();
   }
 
@@ -5773,7 +6004,7 @@ async function agentLoop() {
   document.getElementById('agent-send-btn').disabled = false;
   document.getElementById('agent-stop-btn').style.display = 'none';
   agentSetStatus('Ready', 'ready');
-  _agentCheckBalance();   // warn before SPHERE credits run dry
+  _agentCheckBalance();   // refresh the usage-limit chip (or the wallet warning)
 }
 
 // ── tool summary (one-liner for collapsed card) ────────────────────
@@ -6109,7 +6340,7 @@ The portal hosts the FULL-resolution SPHERE data — all 5,284 CSF and 6,900 pla
 
 Write in third person, past tense. Be concise and precise. Use real numbers from the analysis — do not be vague.` }
     ];
-    const resp = await fetch(SPHERE_API_BASE + '/v1-messages?conversation_id=' + _uuid(), {
+    const resp = await fetch(SPHERE_API_BASE + '/v1-messages?portal=' + _AGENT_PORTAL + '&conversation_id=' + _uuid(), {
       method: 'POST',
       headers: await _agentReqHeaders(),
       body: JSON.stringify({
