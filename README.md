@@ -1,4 +1,4 @@
-# ADRC SPHERE — Synthetic Research Data Hub (portal)
+# ADRC SPHERE — SPHERE Twin Research Data Hub (portal)
 
 Public-facing portal for the **Stanford ADRC SPHERE** dataset — a fully *synthetic*
 version of the Stanford Alzheimer's Disease Research Center cohort (644 participants,
@@ -13,7 +13,7 @@ amendment or data request**. A Data Use Agreement applies.
 - `scripts/` — helper scripts.
 
 The site is **self-contained** — everything needed to serve it is in this repo. (The raw
-synthetic source CSVs are intermediate build artifacts, **not** required to run the site,
+twin source CSVs are intermediate build artifacts, **not** required to run the site,
 so they are not included.)
 
 ## Deploy
