@@ -78,6 +78,7 @@
     --shadow-lg: 0 8px 24px rgba(0,0,0,0.1);
     --font-body: 'DM Sans', sans-serif;
     --font-display: 'Lora', serif;
+    --topbar-h: 58px;      /* header height; the layout/sidebar/main heights derive from it */
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: var(--font-body); background: var(--bg); color: var(--text-primary); font-size: 15px; line-height: 1.6; }
@@ -89,7 +90,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 58px;
+    height: var(--topbar-h);
     position: sticky; top: 0; z-index: 100;
     box-shadow: 0 2px 8px rgba(0,0,0,0.18);
   }
@@ -110,6 +111,13 @@
   .topbar-nav {
     display: flex; align-items: center; gap: 2px;
   }
+  .nav-toggle {
+    display: none; align-items: center; justify-content: center;
+    width: 34px; height: 34px; margin-right: 2px; flex-shrink: 0;
+    background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .nav-toggle svg { width: 17px; height: 17px; stroke: #fff; stroke-width: 2; fill: none; stroke-linecap: round; }
   .topbar-nav a {
     color: rgba(255,255,255,0.75); text-decoration: none; font-size: 13px; font-weight: 400;
     padding: 6px 14px; border-radius: var(--radius-sm); transition: all 0.15s;
@@ -190,11 +198,11 @@
   .sphere-features li::before { content: ""; display: block; width: 7px; height: 7px; border-radius: 50%; background: var(--cardinal); margin-top: 6px; flex-shrink: 0; }
 
   /* ——— SIDEBAR + LAYOUT ——— */
-  .layout { display: flex; min-height: calc(100vh - 58px); }
+  .layout { display: flex; min-height: calc(100vh - var(--topbar-h)); }
   .sidebar {
     width: 240px; flex-shrink: 0; background: var(--bg-white);
     border-right: 1px solid var(--border); padding: 1.5rem 0;
-    position: sticky; top: 58px; height: calc(100vh - 58px); overflow-y: auto;
+    position: sticky; top: var(--topbar-h); height: calc(100vh - var(--topbar-h)); overflow-y: auto;
   }
   .sidebar-section { margin-bottom: 0.25rem; }
   .sidebar-heading {
@@ -214,7 +222,7 @@
   .sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 0.75rem 0; }
 
   /* ——— MAIN CONTENT ——— */
-  .main { flex: 1; overflow-x: hidden; overflow-y: auto; height: calc(100vh - 58px); }
+  .main { flex: 1; overflow-x: hidden; overflow-y: auto; height: calc(100vh - var(--topbar-h)); }
 
   /* ——— HERO BANNER ——— */
   .hero {
@@ -574,10 +582,61 @@
     .request-types { grid-template-columns: 1fr; }
   }
   @media (max-width: 768px) {
-    .sidebar { display: none; }
     .action-grid { grid-template-columns: 1fr; }
     .doc-grid { grid-template-columns: 1fr; }
     .report-criteria { grid-template-columns: 1fr; }
+
+    /* Two-row header: brand on top, nav as a horizontally scrollable strip. The old single
+       58px row could not hold the brand lockup and six links, so both wrapped and spilled
+       over the hero. --topbar-h keeps the layout/sidebar/main heights in step. */
+    :root { --topbar-h: 88px; }
+    .topbar {
+      height: var(--topbar-h);
+      padding: 0 0.875rem;
+      flex-wrap: wrap; align-content: center; row-gap: 0;
+    }
+    /* row 1: hamburger + brand (title truncates rather than wrapping); row 2: the nav strip */
+    .topbar > .nav-toggle, .topbar-brand { height: 50px; }
+    .topbar-brand { gap: 10px; min-width: 0; flex: 1 1 0; overflow: hidden; }
+    .topbar-brand > div { min-width: 0; }
+    .brand-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .brand-icon { width: 30px; height: 30px; flex-shrink: 0; }
+    .brand-icon svg { width: 17px; height: 17px; }
+    .brand-title { font-size: 13px; line-height: 1.25; }
+    .brand-sub { display: none; }   /* the long centre name has no room on a phone */
+    .topbar-nav {
+      flex: 1 1 100%; flex-wrap: nowrap; height: 34px; align-items: flex-start;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; -ms-overflow-style: none;
+      margin: 0 -0.875rem; padding: 0 0.875rem;
+    }
+    .topbar-nav::-webkit-scrollbar { display: none; }
+    .topbar-nav a { white-space: nowrap; font-size: 12.5px; padding: 5px 9px; }
+
+    /* The sidebar becomes an off-canvas drawer opened from the hamburger. */
+    .sidebar {
+      position: fixed; top: var(--topbar-h); left: 0; z-index: 200;
+      width: 268px; max-width: 84vw; height: calc(100vh - var(--topbar-h));
+      transform: translateX(-100%); transition: transform 0.22s ease;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+    }
+    body.nav-open .sidebar { transform: translateX(0); }
+    .nav-scrim {
+      display: none; position: fixed; inset: var(--topbar-h) 0 0 0;
+      background: rgba(0,0,0,0.38); z-index: 150;
+    }
+    body.nav-open .nav-scrim { display: block; }
+    .nav-toggle { display: inline-flex; }
+
+    .hero { padding: 2rem 1.25rem 1.75rem; }
+    .hero h1 { font-size: 27px; }
+    .hero-stats { flex-wrap: wrap; gap: 1rem 1.75rem; margin-top: 1.75rem; padding-top: 1.25rem; }
+    .hero-stat { min-width: 0; }
+    .hero-actions { gap: 8px; }
+
+    #tab-docs [style*="grid-template-columns"] {
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+    }
   }
 
   /* ——— FILTER PANEL ——— */
@@ -1033,6 +1092,19 @@
   .agent-run-figure img { display:block; max-width:100%; }
   .agent-run-figure-caption { font-size:11px; color:#888; padding:.3rem .6rem; background:#f8f8f8; }
 
+  /* ——— MOBILE OVERRIDES (last, so they win over the rules defined above) ——— */
+  @media (max-width: 768px) {
+    .ds-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+    .avail-row { overflow: hidden; }   /* percentage bars round up by a pixel or two */
+    .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ex-tabs-wrap { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+    .ex-tabs-wrap::-webkit-scrollbar { display: none; }
+    .ex-tab { white-space: nowrap; flex-shrink: 0; }
+    .filter-panel, .data-card, .report-card { padding: 1rem; }
+    .content-section, .section-body { padding-left: 1.25rem; padding-right: 1.25rem; }
+    table { font-size: 12px; }
+  }
+
 </style>
 <script>
 /* OAuth return: provider redirects to the portal home with ?access_token=…
@@ -1060,6 +1132,9 @@
 
 <!-- TOP NAV -->
 <nav class="topbar">
+  <button class="nav-toggle" onclick="toggleMobileNav()" aria-label="Open section menu" aria-expanded="false">
+    <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
   <a class="topbar-brand" href="#" onclick="showTab('home');return false;" title="Home">
     <div class="brand-icon">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2C8.5 2 5.5 4 4 7"/><path d="M12 22c3.5 0 6.5-2 8-5"/><path d="M2 12c0-1.5.4-3 1-4.2"/><path d="M22 12c0 1.5-.4 3-1 4.2"/><path d="M6.3 6.3L4.9 4.9"/><path d="M17.7 17.7l1.4 1.4"/></svg>
@@ -1085,6 +1160,7 @@
 <div class="layout">
 
   <!-- SIDEBAR -->
+  <div class="nav-scrim" onclick="toggleMobileNav(false)"></div>
   <aside class="sidebar">
     <div class="sidebar-section">
       <div class="sidebar-heading">Overview</div>
@@ -5598,6 +5674,18 @@ function _agentSealToolUse(reason) {
     type: 'tool_result', tool_use_id: id, is_error: true,
     content: reason || 'Tool call did not complete.' })) });
 }
+
+// Mobile section drawer: the sidebar is off-canvas under 768px.
+function toggleMobileNav(force) {
+  const open = force === undefined ? !document.body.classList.contains('nav-open') : !!force;
+  document.body.classList.toggle('nav-open', open);
+  const btn = document.querySelector('.nav-toggle');
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+}
+document.addEventListener('click', (e) => {
+  if (window.innerWidth > 768) return;
+  if (e.target.closest('.sidebar a')) toggleMobileNav(false);
+});
 
 async function agentSend() {
   if (_agentBusy || !_agentReady()) return;
